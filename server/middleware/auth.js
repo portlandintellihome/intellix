@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import jwt from 'jsonwebtoken'
+import { query } from '../db.js'
 
 let secret = process.env.JWT_SECRET
 if (!secret) {
@@ -24,4 +25,14 @@ export function requireAuth(req, res, next) {
   } catch {
     res.status(401).json({ error: 'Invalid or expired token' })
   }
+}
+
+export async function requireAdmin(req, res, next) {
+  try {
+    const { rows } = await query('SELECT role FROM users WHERE id = $1', [req.user.id])
+    if (rows.length === 0 || rows[0].role !== 'Admin') {
+      return res.status(403).json({ error: 'Admin access required' })
+    }
+    next()
+  } catch (err) { next(err) }
 }

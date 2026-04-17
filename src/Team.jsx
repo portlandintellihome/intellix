@@ -74,67 +74,119 @@ function EmployeeCard({ emp }) {
   )
 }
 
-function AddEmployeeModal({ onClose, onAdd }) {
-  const [form, setForm] = useState({ name: '', role: 'Installer', phone: '', email: '', status: 'On site' })
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-  const canSave = form.name.trim() && form.email.trim()
+const ROLES_WITH_ADMIN = ['Installer', 'Programmer', 'Admin', 'Designer', 'Sales']
 
-  const save = () => {
-    if (!canSave) return
-    onAdd({
-      id: Date.now(),
-      initials: initialsOf(form.name),
-      name: form.name.trim(),
-      role: form.role,
-      phone: form.phone.trim() || '—',
-      email: form.email.trim(),
-      status: form.status,
-      job: '—',
-    })
-    onClose()
+function InviteEmployeeModal({ onClose, onInvited }) {
+  const [form, setForm] = useState({ name: '', role: 'Installer', phone: '', email: '', password: '' })
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [created, setCreated] = useState(null)
+
+  const canSubmit = form.name.trim() && form.email.trim() && form.password.length >= 8
+
+  const submit = async () => {
+    if (!canSubmit || submitting) return
+    setSubmitting(true)
+    setError('')
+    try {
+      const base = import.meta.env.VITE_API_URL || ''
+      const token = localStorage.getItem('intellix_token')
+      const res = await fetch(`${base}/api/auth/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim(),
+          role: form.role,
+          password: form.password,
+          phone: form.phone.trim() || null,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Something went wrong')
+      setCreated({ user: data.user, tempPassword: form.password })
+      onInvited(data.user)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 14, width: 500, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px 14px', borderBottom: '1px solid var(--border2)' }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Add employee</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{created ? 'Account created' : 'Invite employee'}</div>
           <button onClick={onClose} style={{ background: 'var(--bg4)', border: 'none', borderRadius: '50%', width: 26, height: 26, cursor: 'pointer', color: 'var(--text2)', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
         </div>
-        <div style={{ padding: '18px 22px' }}>
-          <div style={{ marginBottom: 12 }}>
-            <div style={lbl}>Full name</div>
-            <input style={inp} placeholder="e.g. John Davis" value={form.name} onChange={e => set('name', e.target.value)} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div>
-              <div style={lbl}>Role</div>
-              <select style={inp} value={form.role} onChange={e => set('role', e.target.value)}>
-                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
+
+        {created ? (
+          <>
+            <div style={{ padding: '18px 22px' }}>
+              <div style={{ fontSize: 12.5, color: 'var(--text2)', marginBottom: 14, lineHeight: 1.5 }}>
+                Share these credentials with <strong style={{ color: 'var(--text)' }}>{created.user.name}</strong>. They'll be required to set a new password on first sign-in.
+              </div>
+              <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 4 }}>Email</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{created.user.email}</div>
+              </div>
+              <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 4 }}>Temporary password</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{created.tempPassword}</div>
+              </div>
             </div>
-            <div>
-              <div style={lbl}>Status</div>
-              <select style={inp} value={form.status} onChange={e => set('status', e.target.value)}>
-                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+            <div style={{ padding: '14px 22px', borderTop: '1px solid var(--border2)', display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={onClose} style={primaryBtn}>Done</button>
             </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div>
-              <div style={lbl}>Phone</div>
-              <input style={inp} type="tel" placeholder="(503) 555-0100" value={form.phone} onChange={e => set('phone', e.target.value)} />
+          </>
+        ) : (
+          <>
+            <div style={{ padding: '18px 22px' }}>
+              <div style={{ marginBottom: 12 }}>
+                <div style={lbl}>Full name</div>
+                <input style={inp} placeholder="e.g. John Davis" value={form.name} onChange={e => set('name', e.target.value)} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                  <div style={lbl}>Email</div>
+                  <input style={inp} type="email" placeholder="name@company.com" value={form.email} onChange={e => set('email', e.target.value)} />
+                </div>
+                <div>
+                  <div style={lbl}>Role</div>
+                  <select style={inp} value={form.role} onChange={e => set('role', e.target.value)}>
+                    {ROLES_WITH_ADMIN.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                  <div style={lbl}>Phone (optional)</div>
+                  <input style={inp} type="tel" placeholder="(503) 555-0100" value={form.phone} onChange={e => set('phone', e.target.value)} />
+                </div>
+                <div>
+                  <div style={lbl}>Temporary password</div>
+                  <input style={inp} type="text" placeholder="min. 8 characters" value={form.password} onChange={e => set('password', e.target.value)} />
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.5 }}>
+                They'll sign in with this password once, then be forced to set a new one.
+              </div>
+              {error && (
+                <div style={{ marginTop: 12, background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.25)', borderRadius: 8, padding: '9px 12px', fontSize: 11.5, color: '#d70015', fontWeight: 500 }}>
+                  {error}
+                </div>
+              )}
             </div>
-            <div>
-              <div style={lbl}>Email</div>
-              <input style={inp} type="email" placeholder="name@acmeav.com" value={form.email} onChange={e => set('email', e.target.value)} />
+            <div style={{ padding: '14px 22px', borderTop: '1px solid var(--border2)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button onClick={onClose} style={ghostBtn}>Cancel</button>
+              <button onClick={submit} disabled={!canSubmit || submitting} style={{ ...primaryBtn, opacity: (canSubmit && !submitting) ? 1 : 0.5, cursor: (canSubmit && !submitting) ? 'pointer' : 'not-allowed' }}>
+                {submitting ? 'Inviting…' : 'Send invite'}
+              </button>
             </div>
-          </div>
-        </div>
-        <div style={{ padding: '14px 22px', borderTop: '1px solid var(--border2)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onClose} style={ghostBtn}>Cancel</button>
-          <button onClick={save} disabled={!canSave} style={{ ...primaryBtn, opacity: canSave ? 1 : 0.5, cursor: canSave ? 'pointer' : 'not-allowed' }}>Add employee</button>
-        </div>
+          </>
+        )}
       </div>
     </div>
   )
@@ -147,7 +199,11 @@ export default function Team() {
 
   useEffect(() => {
     apiGet('/api/team')
-      .then(data => setEmployees(data.map(e => ({ ...e, job: e.job || '—' }))))
+      .then(data => setEmployees(data.map(e => ({
+        ...e,
+        initials: e.initials || initialsOf(e.name),
+        job: e.job || '—',
+      }))))
       .catch(err => console.error('Failed to load team', err))
       .finally(() => setLoading(false))
   }, [])
@@ -176,7 +232,7 @@ export default function Team() {
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Team</div>
           <div style={{ fontSize: 11.5, color: 'var(--text2)' }}>{employees.length} {employees.length === 1 ? 'employee' : 'employees'}</div>
         </div>
-        <button onClick={() => setShowModal(true)} style={primaryBtn}>+ Add employee</button>
+        <button onClick={() => setShowModal(true)} style={primaryBtn}>+ Invite employee</button>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px 24px' }}>
@@ -202,9 +258,12 @@ export default function Team() {
       </div>
 
       {showModal && (
-        <AddEmployeeModal
+        <InviteEmployeeModal
           onClose={() => setShowModal(false)}
-          onAdd={emp => setEmployees(list => [...list, emp])}
+          onInvited={u => setEmployees(list => [
+            { ...u, initials: u.initials || initialsOf(u.name), job: '—' },
+            ...list,
+          ])}
         />
       )}
     </div>

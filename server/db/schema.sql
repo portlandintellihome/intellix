@@ -4,8 +4,18 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   role TEXT DEFAULT 'Employee',
+  phone TEXT,
+  initials TEXT,
+  status TEXT DEFAULT 'Available',
+  must_change_password BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Backfill for DBs created before these columns existed. Safe no-ops otherwise.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS initials TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Available';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS clients (
   id SERIAL PRIMARY KEY,

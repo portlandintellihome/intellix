@@ -2,7 +2,7 @@ import { Router } from 'express'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { query } from '../db.js'
-import { JWT_SECRET, requireAuth } from '../middleware/auth.js'
+import { JWT_SECRET, requireAuth, requireAdmin } from '../middleware/auth.js'
 
 const router = Router()
 
@@ -14,7 +14,20 @@ function signToken(user) {
 }
 
 function publicUser(u) {
-  return { id: u.id, name: u.name, email: u.email, role: u.role }
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    phone: u.phone,
+    initials: u.initials,
+    status: u.status,
+    must_change_password: u.must_change_password,
+  }
+}
+
+function computeInitials(name) {
+  return (name || '').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?'
 }
 
 router.post('/register', async (req, res, next) => {
@@ -26,10 +39,10 @@ router.post('/register', async (req, res, next) => {
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS)
     try {
       const { rows } = await query(
-        `INSERT INTO users (name, email, password_hash, role)
-         VALUES ($1, $2, $3, COALESCE($4, 'Employee'))
+        `INSERT INTO users (name, email, password_hash, role, initials, must_change_password)
+         VALUES ($1, $2, $3, COALESCE($4, 'Employee'), $5, FALSE)
          RETURNING *`,
-        [name, email.toLowerCase(), hash, role]
+        [name, email.toLowerCase(), hash, role, computeInitials(name)]
       )
       const user = rows[0]
       res.json({ token: signToken(user), user: publicUser(user) })
@@ -62,6 +75,54 @@ router.get('/me', requireAuth, async (req, res, next) => {
     const { rows } = await query('SELECT * FROM users WHERE id = $1', [req.user.id])
     if (rows.length === 0) return res.status(401).json({ error: 'User no longer exists' })
     res.json(publicUser(rows[0]))
+  } catch (err) { next(err) }
+})
+
+// Admin-only: create a team-member account with a temp password.
+router.post('/invite', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const { name, email, role, password, phone } = req.body || {}
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'name, email, and password are required' })
+    }
+    const hash = await bcrypt.hash(password, BCRYPT_ROUNDS)
+    try {
+      const { rows } = await query(
+        `INSERT INTO users (name, email, password_hash, role, phone, initials, must_change_password)
+         VALUES ($1, $2, $3, COALESCE($4, 'Employee'), $5, $6, TRUE)
+         RETURNING *`,
+        [name, email.toLowerCase(), hash, role, phone || null, computeInitials(name)]
+      )
+      res.json({ user: publicUser(rows[0]) })
+    } catch (err) {
+      if (err.code === '23505') {
+        return res.status(409).json({ error: 'Email already registered' })
+      }
+      throw err
+    }
+  } catch (err) { next(err) }
+})
+
+router.post('/change-password', requireAuth, async (req, res, next) => {
+  try {
+    const { current_password, new_password } = req.body || {}
+    if (!current_password || !new_password) {
+      return res.status(400).json({ error: 'current_password and new_password are required' })
+    }
+    if (new_password.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' })
+    }
+    const { rows } = await query('SELECT * FROM users WHERE id = $1', [req.user.id])
+    if (rows.length === 0) return res.status(401).json({ error: 'User no longer exists' })
+    const user = rows[0]
+    const ok = await bcrypt.compare(current_password, user.password_hash)
+    if (!ok) return res.status(401).json({ error: 'Current password is incorrect' })
+    const newHash = await bcrypt.hash(new_password, BCRYPT_ROUNDS)
+    const { rows: updated } = await query(
+      `UPDATE users SET password_hash = $1, must_change_password = FALSE WHERE id = $2 RETURNING *`,
+      [newHash, req.user.id]
+    )
+    res.json({ user: publicUser(updated[0]) })
   } catch (err) { next(err) }
 })
 

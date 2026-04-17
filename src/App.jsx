@@ -20,6 +20,7 @@ import Reporting from './Reporting'
 import Integrations from './Integrations'
 import SettingsPage from './Settings'
 import Login from './Login'
+import ChangePassword from './ChangePassword'
 
 const TOKEN_KEY = 'intellix_token'
 
@@ -102,6 +103,14 @@ export default function App() {
     return (
       <div className={dark ? 'dark' : ''}>
         <Login onLogin={setUser} />
+      </div>
+    )
+  }
+
+  if (user.must_change_password) {
+    return (
+      <div className={dark ? 'dark' : ''}>
+        <ChangePassword user={user} onDone={setUser} onLogout={logout} />
       </div>
     )
   }
