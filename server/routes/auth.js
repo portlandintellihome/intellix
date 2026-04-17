@@ -30,7 +30,7 @@ function computeInitials(name) {
   return (name || '').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?'
 }
 
-router.post('/register', async (req, res, next) => {
+router.post('/register', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { name, email, password, role } = req.body || {}
     if (!name || !email || !password) {
@@ -44,8 +44,7 @@ router.post('/register', async (req, res, next) => {
          RETURNING *`,
         [name, email.toLowerCase(), hash, role, computeInitials(name)]
       )
-      const user = rows[0]
-      res.json({ token: signToken(user), user: publicUser(user) })
+      res.json({ user: publicUser(rows[0]) })
     } catch (err) {
       if (err.code === '23505') {
         return res.status(409).json({ error: 'Email already registered' })
