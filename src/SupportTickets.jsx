@@ -185,10 +185,10 @@ function TicketDetail({ ticket, onClose }) {
             ))}
             <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 9, padding: '10px 14px' }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text3)', marginBottom: 6 }}>STATUS</div>
-              <select style={{ background: 'transparent', border: 'none', fontSize: 12.5, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font)', cursor: 'pointer', outline: 'none', width: '100%' }}>
+              <select defaultValue={ticket.status} style={{ background: 'transparent', border: 'none', fontSize: 12.5, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font)', cursor: 'pointer', outline: 'none', width: '100%' }}>
                 <option>Open</option>
-                <option selected={ticket.status === 'In progress'}>In progress</option>
-                <option selected={ticket.status === 'Resolved'}>Resolved</option>
+                <option>In progress</option>
+                <option>Resolved</option>
               </select>
             </div>
           </div>

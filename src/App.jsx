@@ -16,6 +16,9 @@ import DriverLibrary from './DriverLibrary'
 import Inventory from './Inventory'
 import IntelixAssist from './IntelixAssist'
 import Team from './Team'
+import Reporting from './Reporting'
+import Integrations from './Integrations'
+import SettingsPage from './Settings'
 
 
 
@@ -190,9 +193,9 @@ export default function App() {
               <Route path="/inventory" element={<Inventory />} />
               <Route path="/assist" element={<IntelixAssist />} />
               <Route path="/team" element={<Team />} />
-              <Route path="/reporting" element={<Placeholder title="Reporting" />} />
-              <Route path="/integrations" element={<Placeholder title="Integrations & APIs" />} />
-              <Route path="/settings" element={<Placeholder title="Settings" />} />
+              <Route path="/reporting" element={<Reporting />} />
+              <Route path="/integrations" element={<Integrations />} />
+              <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </div>
 

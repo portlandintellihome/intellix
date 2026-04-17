@@ -171,7 +171,7 @@ export default function Dashboard({ setupDone }) {
           <div style={s.card}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
               <div style={s.cardTitle}>Open service tickets</div>
-              <button onClick={() => navigate('/service')} style={{ fontSize:10.5, fontWeight:600, color:'var(--accent)', background:'none', border:'none', cursor:'pointer', fontFamily:'var(--font)' }}>View all</button>
+              <button onClick={() => navigate('/tickets')} style={{ fontSize:10.5, fontWeight:600, color:'var(--accent)', background:'none', border:'none', cursor:'pointer', fontFamily:'var(--font)' }}>View all</button>
             </div>
             {tickets.map((t, i) => (
               <div key={i} style={i < tickets.length - 1 ? s.row : s.rowLast}>

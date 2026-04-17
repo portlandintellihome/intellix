@@ -18,7 +18,7 @@ const statusStyle = {
 }
 
 const ROLES = ['Installer', 'Programmer', 'Admin', 'Designer', 'Sales']
-const STATUSES = ['On site', 'Available', 'Office', 'Remote']
+const STATUSES = ['On site', 'Remote']
 
 const lbl = { fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }
 const inp = { width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 11px', fontSize: 12.5, color: 'var(--text)', fontFamily: 'var(--font)', outline: 'none' }
@@ -81,7 +81,7 @@ function EmployeeCard({ emp }) {
 }
 
 function AddEmployeeModal({ onClose, onAdd }) {
-  const [form, setForm] = useState({ name: '', role: 'Installer', phone: '', email: '', status: 'Available' })
+  const [form, setForm] = useState({ name: '', role: 'Installer', phone: '', email: '', status: 'On site' })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const canSave = form.name.trim() && form.email.trim()
 
@@ -168,7 +168,7 @@ export default function Team() {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px 24px' }}>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${STATUSES.length}, 1fr)`, gap: 10, marginBottom: 18 }}>
           {STATUSES.map(s => {
             const st = statusStyle[s]
             return (
