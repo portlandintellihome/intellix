@@ -79,7 +79,7 @@ function AddTeamMemberModal({ onClose, onAdded }) {
     try {
       const base = import.meta.env.VITE_API_URL || ''
       const token = localStorage.getItem('intellix_token')
-      const res = await fetch(`${base}/api/auth/register`, {
+      const res = await fetch(`${base}/api/auth/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -112,7 +112,7 @@ function AddTeamMemberModal({ onClose, onAdded }) {
           <>
             <div style={{ padding: '18px 22px' }}>
               <div style={{ fontSize: 12.5, color: 'var(--text2)', marginBottom: 14, lineHeight: 1.5 }}>
-                Share these credentials with <strong style={{ color: 'var(--text)' }}>{created.user.name}</strong>. They can sign in right away and change their password from their account.
+                Share these credentials with <strong style={{ color: 'var(--text)' }}>{created.user.name}</strong>. They'll be required to set a new password on first sign-in.
               </div>
               <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 4 }}>Email</div>
@@ -151,7 +151,7 @@ function AddTeamMemberModal({ onClose, onAdded }) {
                 </div>
               </div>
               <div style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.5 }}>
-                Share the temporary password with them; they can change it from their account.
+                They'll sign in with this password once, then be forced to set a new one.
               </div>
               {error && (
                 <div style={{ marginTop: 12, background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.25)', borderRadius: 8, padding: '9px 12px', fontSize: 11.5, color: '#d70015', fontWeight: 500 }}>
