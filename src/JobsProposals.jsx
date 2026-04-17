@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { apiGet } from './lib/api'
 
 const PROPOSALS = [
   { id: 1, client: 'Martinez Family', address: '142 Oak Street, Portland OR', scope: 'Full home AV, lighting, HVAC control', devices: 'EA-5, 4x TVs, Lutron RadioRA3, Ecobee, Sonos', rooms: 6, labor: 2400, materials: 18500, total: 20900, status: 'Sent', created: 'Apr 14', assigned: 'MR', portalId: 'PRT-1042' },
@@ -6,12 +7,6 @@ const PROPOSALS = [
   { id: 3, client: 'Thompson Residence', address: '55 Pine Ave, Lake Oswego OR', scope: 'Multi-room audio and network', devices: 'EA-3, Sonos, Araknis network', rooms: 4, labor: 900, materials: 6200, total: 7100, status: 'Accepted', created: 'Apr 10', assigned: 'MR', portalId: 'PRT-1039' },
 ]
 
-const JOBS = [
-  { id: 1, name: 'Lakeside Residence', client: 'Johnson Family', address: '12 Lakeside Dr', phase: 'Installation', assigned: ['JD', 'MR'], status: 'On site', start: 'Apr 13', scope: 'Full AV, lighting, network', priority: 'High' },
-  { id: 2, name: 'Downtown Penthouse', client: 'Rivera LLC', address: '800 SW Main St', phase: 'Programming', assigned: ['SW'], status: 'In progress', start: 'Apr 11', scope: '5.1 audio, lighting scenes', priority: 'Normal' },
-  { id: 3, name: 'Hillcrest Estate', client: 'Chen Family', address: '900 Hillcrest Rd', phase: 'Sign-off', assigned: ['JD'], status: 'Review', start: 'Apr 8', scope: 'Full home automation', priority: 'Normal' },
-  { id: 4, name: 'Thompson Residence', client: 'Thompson Family', address: '55 Pine Ave', phase: 'Scheduling', assigned: ['MR', 'SW'], status: 'Scheduled', start: 'Apr 22', scope: 'Multi-room audio and network', priority: 'Normal' },
-]
 
 const teamColors = { JD: '#0066cc', MR: '#34c759', SW: '#534AB7', AL: '#ff9500' }
 
@@ -123,9 +118,34 @@ const ghostBtn = { padding: '8px 14px', borderRadius: 8, fontSize: 12.5, fontWei
 const portalBtn = { padding: '7px 12px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--accent)', fontFamily: 'var(--font)', display: 'inline-flex', alignItems: 'center', gap: 5 }
 
 export default function JobsProposals() {
+  const [jobs, setJobs] = useState([])
+  const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('proposals')
   const [showJob, setShowJob] = useState(false)
   const [selected, setSelected] = useState(null)
+
+  useEffect(() => {
+    apiGet('/api/jobs')
+      .then(rows => setJobs(rows.map(j => ({
+        ...j,
+        assigned: j.assigned || [],
+        start: j.start || j.start_date || '',
+        client: j.client_name || '',
+      }))))
+      .catch(err => console.error('Failed to load jobs', err))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Jobs & proposals</div>
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13, fontWeight: 500 }}>Loading…</div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
@@ -147,8 +167,8 @@ export default function JobsProposals() {
       <div style={{ display: 'flex', padding: '0 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
       {[
   { key: 'proposals', label: `Proposals (${PROPOSALS.length})` },
-  { key: 'pending', label: `Pending (${JOBS.filter(j => j.status === 'Scheduled').length})` },
-  { key: 'jobs', label: `Active jobs (${JOBS.filter(j => j.status !== 'Scheduled').length})` },
+  { key: 'pending', label: `Pending (${jobs.filter(j => j.status === 'Scheduled').length})` },
+  { key: 'jobs', label: `Active jobs (${jobs.filter(j => j.status !== 'Scheduled').length})` },
 ].map(t => (
   <button key={t.key} onClick={() => { setTab(t.key); setSelected(null) }} style={{ padding: '10px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'transparent', color: tab === t.key ? 'var(--accent)' : 'var(--text2)', borderBottom: `2px solid ${tab === t.key ? 'var(--accent)' : 'transparent'}`, fontFamily: 'var(--font)', transition: 'all 0.12s' }}>
     {t.label}
@@ -159,10 +179,10 @@ export default function JobsProposals() {
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
 {tab === 'pending' && (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-    {JOBS.filter(j => j.status === 'Scheduled').length === 0 && (
+    {jobs.filter(j => j.status === 'Scheduled').length === 0 && (
       <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)', fontSize: 13 }}>No pending jobs</div>
     )}
-    {JOBS.filter(j => j.status === 'Scheduled').map(job => (
+    {jobs.filter(j => j.status === 'Scheduled').map(job => (
       <div key={job.id} onClick={() => setSelected(selected?.id === job.id ? null : job)} style={{ background: 'var(--bg2)', border: `1px solid ${selected?.id === job.id ? 'var(--accent)' : 'var(--border2)'}`, borderRadius: 11, padding: '14px 16px', cursor: 'pointer', transition: 'all 0.12s' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ flex: 1 }}>
@@ -195,7 +215,7 @@ export default function JobsProposals() {
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 20 }}>
               {['Scheduling', 'Installation', 'Programming', 'Sign-off', 'Complete'].map(phase => {
-                const count = JOBS.filter(j => j.phase === phase && j.status !== 'Scheduled').length
+                const count = jobs.filter(j => j.phase === phase && j.status !== 'Scheduled').length
                 return (
                   <div key={phase} style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>{phase}</div>
@@ -205,7 +225,7 @@ export default function JobsProposals() {
               })}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {JOBS.map(job => (
+              {jobs.map(job => (
                 <div key={job.id} onClick={() => setSelected(selected?.id === job.id ? null : job)} style={{ background: 'var(--bg2)', border: `1px solid ${selected?.id === job.id ? 'var(--accent)' : 'var(--border2)'}`, borderRadius: 11, padding: '14px 16px', cursor: 'pointer', transition: 'all 0.12s' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{ flex: 1 }}>
