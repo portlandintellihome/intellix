@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Briefcase, Users, HeadphonesIcon,
   CalendarDays, Wrench, Library, Package,
-  Bot, Users2, BarChart2, Plug, Settings, LogOut, Mail
+  Bot, Users2, BarChart2, Plug, Settings, LogOut, Mail, FolderOpen
 } from 'lucide-react'
 import Dashboard from './Dashboard'
 import './index.css'
@@ -20,6 +20,7 @@ import Reporting from './Reporting'
 import Integrations from './Integrations'
 import SettingsPage from './Settings'
 import Outreach from './Outreach'
+import IntelliFile from './IntelliFile'
 import Login from './Login'
 import ChangePassword from './ChangePassword'
 
@@ -36,6 +37,7 @@ const NAV = [
   { path: '/tickets', label: 'Support tickets', icon: HeadphonesIcon },
   { path: '/calendar', label: 'Calendar', icon: CalendarDays },
   { path: '/outreach', label: 'Outreach', icon: Mail },
+  { path: '/intellifile', label: 'IntelliFile', icon: FolderOpen },
   { section: 'Workspace' },
   { path: '/composer', label: 'Composer builds', icon: Wrench },
   { path: '/drivers', label: 'Driver library', icon: Library },
@@ -257,6 +259,8 @@ export default function App() {
               <Route path="/tickets" element={<SupportTickets />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/outreach" element={<Outreach />} />
+              <Route path="/intellifile" element={<IntelliFile />} />
+              <Route path="/intellifile/:id" element={<IntelliFile />} />
               <Route path="/composer" element={<ComposerBuilds />} />
               <Route path="/drivers" element={<DriverLibrary />} />
               <Route path="/inventory" element={<Inventory />} />

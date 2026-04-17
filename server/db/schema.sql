@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS clients (
   plan_tier TEXT DEFAULT 'None',
   plan_start_date DATE,
   plan_renewal_date DATE,
+  intellifile JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS clients (
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_tier TEXT DEFAULT 'None';
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_start_date DATE;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_renewal_date DATE;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS intellifile JSONB DEFAULT '{}';
 
 CREATE TABLE IF NOT EXISTS check_ins (
   id SERIAL PRIMARY KEY,
