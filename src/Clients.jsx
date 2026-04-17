@@ -1,48 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-
-const CLIENTS = [
-  {
-    id: 1, name: 'Johnson Family', email: 'johnson@email.com', phone: '(503) 555-0142',
-    address: '12 Lakeside Dr, Portland OR 97201', since: 'Jan 2024', status: 'Active',
-    jobs: [{ name: 'Lakeside Residence', status: 'On site', date: 'Apr 13 2026' }],
-    proposals: [{ id: 'PRT-1035', name: 'Full home AV', status: 'Accepted', total: 22400, date: 'Mar 28 2026' }],
-    notes: 'Prefers Lutron for all lighting. Main contact is Sarah Johnson. Best time to call after 5pm.',
-    tags: ['VIP', 'Repeat'],
-  },
-  {
-    id: 2, name: 'Rivera LLC', email: 'contact@riverallc.com', phone: '(503) 555-0198',
-    address: '800 SW Main St, Portland OR 97205', since: 'Mar 2026', status: 'Active',
-    jobs: [{ name: 'Downtown Penthouse', status: 'In progress', date: 'Apr 11 2026' }],
-    proposals: [{ id: 'PRT-1040', name: 'Penthouse AV & audio', status: 'Accepted', total: 18900, date: 'Apr 1 2026' }],
-    notes: 'Commercial client. Contact is Marco Rivera. Prefers communication via email only.',
-    tags: ['Commercial'],
-  },
-  {
-    id: 3, name: 'Chen Family', email: 'chen.family@gmail.com', phone: '(503) 555-0177',
-    address: '900 Hillcrest Rd, Lake Oswego OR 97034', since: 'Feb 2026', status: 'Active',
-    jobs: [{ name: 'Hillcrest Estate', status: 'Review', date: 'Apr 8 2026' }],
-    proposals: [{ id: 'PRT-1037', name: 'Full home automation', status: 'Accepted', total: 31200, date: 'Feb 14 2026' }],
-    notes: 'Large estate project. Very detail oriented — document everything. Follow up weekly.',
-    tags: ['VIP'],
-  },
-  {
-    id: 4, name: 'Thompson Family', email: 'thompsons@email.com', phone: '(971) 555-0133',
-    address: '55 Pine Ave, Lake Oswego OR 97034', since: 'Apr 2026', status: 'New',
-    jobs: [{ name: 'Thompson Residence', status: 'Scheduled', date: 'Apr 22 2026' }],
-    proposals: [{ id: 'PRT-1039', name: 'Multi-room audio and network', status: 'Accepted', total: 7100, date: 'Apr 10 2026' }],
-    notes: 'New client, referral from Johnson Family.',
-    tags: ['New', 'Referral'],
-  },
-  {
-    id: 5, name: 'Park Realty', email: 'info@parkrealty.com', phone: '(503) 555-0155',
-    address: '200 Harbor View Blvd, Portland OR 97210', since: 'Nov 2023', status: 'Service',
-    jobs: [{ name: 'Harbor View Condo', status: 'Complete', date: 'Feb 2 2026' }],
-    proposals: [{ id: 'PRT-1028', name: 'Condo AV setup', status: 'Accepted', total: 9400, date: 'Jan 10 2026' }],
-    notes: 'Post-install service client. TV not responding issue open. Contact is David Park.',
-    tags: ['Service'],
-  },
-]
+import { apiGet } from './lib/api'
 
 const tagColors = {
   VIP: { bg: 'rgba(83,74,183,0.1)', color: '#534AB7' },
@@ -208,19 +166,47 @@ function ClientDetail({ client, onClose }) {
 }
 
 export default function Clients() {
-const [search, setSearch] = useState('')
-const [filter, setFilter] = useState('All')
-const [showNew, setShowNew] = useState(false)
-const location = useLocation()
+  const [clients, setClients] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('All')
+  const [showNew, setShowNew] = useState(false)
+  const [selected, setSelected] = useState(null)
+  const location = useLocation()
 
-const autoOpen = location.state?.openClientId
-  ? CLIENTS.find(c => c.id === location.state.openClientId) || null
-  : null
-  
+  useEffect(() => {
+    apiGet('/api/clients')
+      .then(rows => setClients(rows.map(c => ({
+        ...c,
+        jobs: c.jobs || [],
+        proposals: c.proposals || [],
+        tags: c.tags || [],
+        email: c.email || '',
+        address: c.address || '',
+      }))))
+      .catch(err => console.error('Failed to load clients', err))
+      .finally(() => setLoading(false))
+  }, [])
 
-const [selected, setSelected] = useState(autoOpen)
+  useEffect(() => {
+    if (!loading && location.state?.openClientId) {
+      const match = clients.find(c => c.id === location.state.openClientId)
+      if (match) setSelected(match)
+    }
+  }, [loading, clients, location.state])
 
-  const filtered = CLIENTS.filter(c => {
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Clients</div>
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13, fontWeight: 500 }}>Loading…</div>
+      </div>
+    )
+  }
+
+  const filtered = clients.filter(c => {
     const matchFilter = filter === 'All' || c.status === filter
     const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.email.toLowerCase().includes(search.toLowerCase()) ||

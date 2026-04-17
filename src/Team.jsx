@@ -1,11 +1,5 @@
-import { useState } from 'react'
-
-const EMPLOYEES = [
-  { id: 1, initials: 'JD', name: 'John Davis', role: 'Installer', phone: '(503) 555-0110', email: 'john@acmeav.com', status: 'On site', job: 'Lakeside Residence' },
-  { id: 2, initials: 'SW', name: 'Sam Wright', role: 'Programmer', phone: '(503) 555-0121', email: 'sam@acmeav.com', status: 'Remote', job: 'Downtown Penthouse' },
-  { id: 3, initials: 'MR', name: 'Mike Reyes', role: 'Installer', phone: '(503) 555-0132', email: 'mike@acmeav.com', status: 'Available', job: '—' },
-  { id: 4, initials: 'AL', name: 'Amy Liu', role: 'Admin', phone: '(503) 555-0143', email: 'amy@acmeav.com', status: 'Office', job: '—' },
-]
+import { useState, useEffect } from 'react'
+import { apiGet } from './lib/api'
 
 const teamColors = { JD: '#0066cc', MR: '#34c759', SW: '#534AB7', AL: '#ff9500' }
 const fallbackColors = ['#0066cc', '#34c759', '#534AB7', '#ff9500', '#ff3b30']
@@ -147,13 +141,32 @@ function AddEmployeeModal({ onClose, onAdd }) {
 }
 
 export default function Team() {
-  const [employees, setEmployees] = useState(EMPLOYEES)
+  const [employees, setEmployees] = useState([])
+  const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+
+  useEffect(() => {
+    apiGet('/api/team')
+      .then(data => setEmployees(data.map(e => ({ ...e, job: e.job || '—' }))))
+      .catch(err => console.error('Failed to load team', err))
+      .finally(() => setLoading(false))
+  }, [])
 
   const counts = STATUSES.reduce((acc, s) => {
     acc[s] = employees.filter(e => e.status === s).length
     return acc
   }, {})
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Team</div>
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13, fontWeight: 500 }}>Loading…</div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>

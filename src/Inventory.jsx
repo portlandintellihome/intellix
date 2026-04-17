@@ -1,19 +1,5 @@
-import { useState } from 'react'
-
-const INVENTORY = [
-  { id: 1, name: 'Control4 EA-5', cat: 'Controllers', qty: 2, onOrder: 1, location: 'Main warehouse', cost: 1899, supplier: 'SnapOne', status: 'In stock' },
-  { id: 2, name: 'Control4 EA-3', cat: 'Controllers', qty: 1, onOrder: 2, location: 'Main warehouse', cost: 999, supplier: 'SnapOne', status: 'In stock' },
-  { id: 3, name: 'Lutron RadioRA 3 Bridge', cat: 'Lighting', qty: 3, onOrder: 0, location: 'Main warehouse', cost: 449, supplier: 'Lutron', status: 'In stock' },
-  { id: 4, name: 'Lutron Caseta Smart Bridge Pro', cat: 'Lighting', qty: 1, onOrder: 0, location: 'Main warehouse', cost: 179, supplier: 'Lutron', status: 'Low stock' },
-  { id: 5, name: 'Sonos Amp', cat: 'Audio', qty: 4, onOrder: 2, location: 'Main warehouse', cost: 699, supplier: 'Sonos', status: 'In stock' },
-  { id: 6, name: 'Triad One Streamer', cat: 'Audio', qty: 2, onOrder: 0, location: 'Van', cost: 499, supplier: 'SnapOne', status: 'In stock' },
-  { id: 7, name: 'Araknis 8-Port Switch', cat: 'Network', qty: 5, onOrder: 3, location: 'Main warehouse', cost: 299, supplier: 'SnapOne', status: 'In stock' },
-  { id: 8, name: 'Araknis WAP', cat: 'Network', qty: 3, onOrder: 0, location: 'Main warehouse', cost: 249, supplier: 'SnapOne', status: 'In stock' },
-  { id: 9, name: 'WattBox 600 Series', cat: 'Power', qty: 2, onOrder: 4, location: 'Main warehouse', cost: 349, supplier: 'SnapOne', status: 'In stock' },
-  { id: 10, name: 'Ecobee Smart Thermostat', cat: 'HVAC', qty: 0, onOrder: 3, location: '—', cost: 249, supplier: 'Ecobee', status: 'On order' },
-  { id: 11, name: 'Control4 8-Button Keypad', cat: 'Keypads', qty: 6, onOrder: 0, location: 'Main warehouse', cost: 299, supplier: 'SnapOne', status: 'In stock' },
-  { id: 12, name: 'Control4 Dimmer Switch', cat: 'Keypads', qty: 0, onOrder: 8, location: '—', cost: 149, supplier: 'SnapOne', status: 'On order' },
-]
+import { useState, useEffect } from 'react'
+import { apiGet } from './lib/api'
 
 const CATS = ['All', 'Controllers', 'Lighting', 'Audio', 'Network', 'Power', 'HVAC', 'Keypads']
 
@@ -85,21 +71,48 @@ function AddItemModal({ onClose }) {
 }
 
 export default function Inventory() {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
   const [cat, setCat] = useState('All')
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [tab, setTab] = useState('stock')
 
-  const filtered = INVENTORY.filter(item => {
+  useEffect(() => {
+    apiGet('/api/inventory')
+      .then(rows => setItems(rows.map(r => ({
+        ...r,
+        cat: r.category ?? r.cat,
+        onOrder: r.on_order ?? r.onOrder ?? 0,
+        cost: Number(r.cost) || 0,
+        qty: Number(r.qty) || 0,
+        supplier: r.supplier ?? '',
+      }))))
+      .catch(err => console.error('Failed to load inventory', err))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Inventory</div>
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13, fontWeight: 500 }}>Loading…</div>
+      </div>
+    )
+  }
+
+  const filtered = items.filter(item => {
     const matchCat = cat === 'All' || item.cat === cat
     const matchSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.supplier.toLowerCase().includes(search.toLowerCase())
     const matchTab = tab === 'stock' ? item.qty > 0 : item.onOrder > 0
     return matchCat && matchSearch && matchTab
   })
 
-  const totalValue = INVENTORY.reduce((a, i) => a + (i.cost * i.qty), 0)
-  const onOrderCount = INVENTORY.reduce((a, i) => a + i.onOrder, 0)
-  const lowStock = INVENTORY.filter(i => i.status === 'Low stock' || i.status === 'Out of stock').length
+  const totalValue = items.reduce((a, i) => a + (i.cost * i.qty), 0)
+  const onOrderCount = items.reduce((a, i) => a + i.onOrder, 0)
+  const lowStock = items.filter(i => i.status === 'Low stock' || i.status === 'Out of stock').length
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
@@ -126,8 +139,8 @@ export default function Inventory() {
       <div style={{ background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
         <div style={{ display: 'flex', padding: '0 24px' }}>
           {[
-            { key: 'stock', label: 'In stock (' + INVENTORY.filter(i => i.qty > 0).length + ')' },
-            { key: 'order', label: 'On order (' + INVENTORY.filter(i => i.onOrder > 0).length + ')' },
+            { key: 'stock', label: 'In stock (' + items.filter(i => i.qty > 0).length + ')' },
+            { key: 'order', label: 'On order (' + items.filter(i => i.onOrder > 0).length + ')' },
           ].map(t => (
             <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '10px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'transparent', color: tab === t.key ? 'var(--accent)' : 'var(--text2)', borderBottom: '2px solid ' + (tab === t.key ? 'var(--accent)' : 'transparent'), fontFamily: 'var(--font)', transition: 'all 0.12s' }}>{t.label}</button>
           ))}

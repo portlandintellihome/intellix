@@ -1,58 +1,5 @@
-import { useState } from 'react'
-
-const TICKETS = [
-  {
-    id: 'TKT-001', client: 'Park Realty', contact: 'David Park', phone: '(503) 555-0155',
-    issue: 'Living room TV not responding to Control4', type: 'Device', priority: 'Urgent',
-    status: 'Open', created: 'Apr 16 · 7:30am', assigned: 'JD',
-    job: 'Harbor View Condo', notes: 'Client says TV was working yesterday. Possibly driver issue after firmware update.',
-    history: [
-      { by: 'System', time: 'Apr 16 · 7:30am', note: 'Ticket created' },
-      { by: 'JD', time: 'Apr 16 · 8:00am', note: 'Contacted client. Will attempt remote fix via OVRC first.' },
-    ]
-  },
-  {
-    id: 'TKT-002', client: 'Apex Corp', contact: 'Apex Admin', phone: '(503) 555-0190',
-    issue: 'Thermostat showing offline after system update', type: 'Device', priority: 'Urgent',
-    status: 'In progress', created: 'Apr 15 · 2:00pm', assigned: 'SW',
-    job: 'Northgate Office', notes: 'Ecobee driver may need to be re-added. SW checking remotely.',
-    history: [
-      { by: 'System', time: 'Apr 15 · 2:00pm', note: 'Ticket created' },
-      { by: 'SW', time: 'Apr 15 · 3:30pm', note: 'Identified issue — driver lost connection after OS update. Working on fix.' },
-    ]
-  },
-  {
-    id: 'TKT-003', client: 'Johnson Family', contact: 'Sarah Johnson', phone: '(503) 555-0142',
-    issue: 'Add guest network access point to back patio', type: 'Change', priority: 'Normal',
-    status: 'Open', created: 'Apr 14 · 10:15am', assigned: 'MR',
-    job: 'Lakeside Residence', notes: 'Client wants to extend WiFi to back patio. Need to quote additional AP.',
-    history: [
-      { by: 'System', time: 'Apr 14 · 10:15am', note: 'Ticket created' },
-    ]
-  },
-  {
-    id: 'TKT-004', client: 'Chen Family', contact: 'Chen Family', phone: '(503) 555-0177',
-    issue: 'Lutron keypad unresponsive in master bedroom', type: 'Warranty', priority: 'Normal',
-    status: 'In progress', created: 'Apr 12 · 4:00pm', assigned: 'JD',
-    job: 'Hillcrest Estate', notes: 'Keypad may need replacement. Under warranty — contacting Lutron.',
-    history: [
-      { by: 'System', time: 'Apr 12 · 4:00pm', note: 'Ticket created' },
-      { by: 'JD', time: 'Apr 13 · 9:00am', note: 'Lutron warranty claim submitted. Replacement ETA 3-5 days.' },
-    ]
-  },
-  {
-    id: 'TKT-005', client: 'Rivera LLC', contact: 'Marco Rivera', phone: '(503) 555-0198',
-    issue: 'Add outdoor speaker zone to patio', type: 'Change', priority: 'Normal',
-    status: 'Resolved', created: 'Apr 8 · 11:00am', assigned: 'MR',
-    job: 'Downtown Penthouse', notes: 'Added Sonos outdoor speakers to patio zone. Tested and signed off.',
-    history: [
-      { by: 'System', time: 'Apr 8 · 11:00am', note: 'Ticket created' },
-      { by: 'MR', time: 'Apr 9 · 2:00pm', note: 'Quoted additional Sonos outdoor speakers.' },
-      { by: 'MR', time: 'Apr 11 · 4:30pm', note: 'Installation complete. Client signed off.' },
-      { by: 'System', time: 'Apr 11 · 4:31pm', note: 'Ticket resolved' },
-    ]
-  },
-]
+import { useState, useEffect } from 'react'
+import { apiGet } from './lib/api'
 
 const teamColors = { JD: '#0066cc', MR: '#34c759', SW: '#534AB7', AL: '#ff9500' }
 
@@ -240,22 +187,42 @@ function TicketDetail({ ticket, onClose }) {
 }
 
 export default function SupportTickets() {
+  const [tickets, setTickets] = useState([])
+  const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('All')
   const [typeFilter, setTypeFilter] = useState('All')
   const [showNew, setShowNew] = useState(false)
   const [selected, setSelected] = useState(null)
 
-  const filtered = TICKETS.filter(t => {
+  useEffect(() => {
+    apiGet('/api/tickets')
+      .then(rows => setTickets(rows.map(r => ({ ...r, history: r.history || [] }))))
+      .catch(err => console.error('Failed to load tickets', err))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Support tickets</div>
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13, fontWeight: 500 }}>Loading…</div>
+      </div>
+    )
+  }
+
+  const filtered = tickets.filter(t => {
     const matchStatus = filter === 'All' || t.status === filter
     const matchType = typeFilter === 'All' || t.type === typeFilter
     return matchStatus && matchType
   })
 
   const counts = {
-    open: TICKETS.filter(t => t.status === 'Open').length,
-    inProgress: TICKETS.filter(t => t.status === 'In progress').length,
-    resolved: TICKETS.filter(t => t.status === 'Resolved').length,
-    urgent: TICKETS.filter(t => t.priority === 'Urgent').length,
+    open: tickets.filter(t => t.status === 'Open').length,
+    inProgress: tickets.filter(t => t.status === 'In progress').length,
+    resolved: tickets.filter(t => t.status === 'Resolved').length,
+    urgent: tickets.filter(t => t.priority === 'Urgent').length,
   }
 
   return (
