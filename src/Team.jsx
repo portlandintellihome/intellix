@@ -9,7 +9,7 @@ const statusStyle = {
   Remote:      { bg: 'rgba(83,74,183,0.09)',  color: '#534AB7', dot: '#534AB7' },
 }
 
-const ROLES = ['Installer', 'Programmer', 'Admin', 'Designer', 'Sales']
+const ROLES = ['Admin', 'Programmer', 'Technician']
 const STATUSES = ['On site', 'Remote']
 
 const lbl = { fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }
@@ -63,10 +63,8 @@ function EmployeeCard({ emp }) {
   )
 }
 
-const ROLES_WITH_ADMIN = ['Installer', 'Programmer', 'Admin', 'Designer', 'Sales']
-
-function InviteEmployeeModal({ onClose, onInvited }) {
-  const [form, setForm] = useState({ name: '', role: 'Installer', phone: '', email: '', password: '' })
+function AddTeamMemberModal({ onClose, onAdded }) {
+  const [form, setForm] = useState({ name: '', email: '', role: 'Technician', password: '' })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -81,7 +79,7 @@ function InviteEmployeeModal({ onClose, onInvited }) {
     try {
       const base = import.meta.env.VITE_API_URL || ''
       const token = localStorage.getItem('intellix_token')
-      const res = await fetch(`${base}/api/auth/invite`, {
+      const res = await fetch(`${base}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -89,13 +87,12 @@ function InviteEmployeeModal({ onClose, onInvited }) {
           email: form.email.trim(),
           role: form.role,
           password: form.password,
-          phone: form.phone.trim() || null,
         }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Something went wrong')
       setCreated({ user: data.user, tempPassword: form.password })
-      onInvited(data.user)
+      onAdded(data.user)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -107,7 +104,7 @@ function InviteEmployeeModal({ onClose, onInvited }) {
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 14, width: 500, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px 14px', borderBottom: '1px solid var(--border2)' }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{created ? 'Account created' : 'Invite employee'}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{created ? 'Team member added' : 'Add team member'}</div>
           <button onClick={onClose} style={{ background: 'var(--bg4)', border: 'none', borderRadius: '50%', width: 26, height: 26, cursor: 'pointer', color: 'var(--text2)', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
         </div>
 
@@ -115,7 +112,7 @@ function InviteEmployeeModal({ onClose, onInvited }) {
           <>
             <div style={{ padding: '18px 22px' }}>
               <div style={{ fontSize: 12.5, color: 'var(--text2)', marginBottom: 14, lineHeight: 1.5 }}>
-                Share these credentials with <strong style={{ color: 'var(--text)' }}>{created.user.name}</strong>. They'll be required to set a new password on first sign-in.
+                Share these credentials with <strong style={{ color: 'var(--text)' }}>{created.user.name}</strong>. They can sign in right away and change their password from their account.
               </div>
               <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 4 }}>Email</div>
@@ -137,22 +134,16 @@ function InviteEmployeeModal({ onClose, onInvited }) {
                 <div style={lbl}>Full name</div>
                 <input style={inp} placeholder="Full name" value={form.name} onChange={e => set('name', e.target.value)} />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                <div>
-                  <div style={lbl}>Email</div>
-                  <input style={inp} type="email" placeholder="name@company.com" value={form.email} onChange={e => set('email', e.target.value)} />
-                </div>
-                <div>
-                  <div style={lbl}>Role</div>
-                  <select style={inp} value={form.role} onChange={e => set('role', e.target.value)}>
-                    {ROLES_WITH_ADMIN.map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                </div>
+              <div style={{ marginBottom: 12 }}>
+                <div style={lbl}>Email</div>
+                <input style={inp} type="email" placeholder="name@company.com" value={form.email} onChange={e => set('email', e.target.value)} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                 <div>
-                  <div style={lbl}>Phone (optional)</div>
-                  <input style={inp} type="tel" placeholder="(503) 555-0100" value={form.phone} onChange={e => set('phone', e.target.value)} />
+                  <div style={lbl}>Role</div>
+                  <select style={inp} value={form.role} onChange={e => set('role', e.target.value)}>
+                    {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
                 </div>
                 <div>
                   <div style={lbl}>Temporary password</div>
@@ -160,7 +151,7 @@ function InviteEmployeeModal({ onClose, onInvited }) {
                 </div>
               </div>
               <div style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.5 }}>
-                They'll sign in with this password once, then be forced to set a new one.
+                Share the temporary password with them; they can change it from their account.
               </div>
               {error && (
                 <div style={{ marginTop: 12, background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.25)', borderRadius: 8, padding: '9px 12px', fontSize: 11.5, color: '#d70015', fontWeight: 500 }}>
@@ -171,7 +162,7 @@ function InviteEmployeeModal({ onClose, onInvited }) {
             <div style={{ padding: '14px 22px', borderTop: '1px solid var(--border2)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button onClick={onClose} style={ghostBtn}>Cancel</button>
               <button onClick={submit} disabled={!canSubmit || submitting} style={{ ...primaryBtn, opacity: (canSubmit && !submitting) ? 1 : 0.5, cursor: (canSubmit && !submitting) ? 'pointer' : 'not-allowed' }}>
-                {submitting ? 'Inviting…' : 'Send invite'}
+                {submitting ? 'Adding…' : 'Add team member'}
               </button>
             </div>
           </>
@@ -219,9 +210,9 @@ export default function Team() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Team</div>
-          <div style={{ fontSize: 11.5, color: 'var(--text2)' }}>{employees.length} {employees.length === 1 ? 'employee' : 'employees'}</div>
+          <div style={{ fontSize: 11.5, color: 'var(--text2)' }}>{employees.length} {employees.length === 1 ? 'team member' : 'team members'}</div>
         </div>
-        <button onClick={() => setShowModal(true)} style={primaryBtn}>+ Invite employee</button>
+        <button onClick={() => setShowModal(true)} style={primaryBtn}>+ Add team member</button>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px 24px' }}>
@@ -244,8 +235,8 @@ export default function Team() {
         {employees.length === 0 ? (
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>No team members yet</div>
-            <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 14 }}>Invite your first teammate to set them up with a login.</div>
-            <button onClick={() => setShowModal(true)} style={primaryBtn}>+ Invite employee</button>
+            <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 14 }}>Add your first team member to set them up with a login.</div>
+            <button onClick={() => setShowModal(true)} style={primaryBtn}>+ Add team member</button>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
@@ -255,9 +246,9 @@ export default function Team() {
       </div>
 
       {showModal && (
-        <InviteEmployeeModal
+        <AddTeamMemberModal
           onClose={() => setShowModal(false)}
-          onInvited={u => setEmployees(list => [
+          onAdded={u => setEmployees(list => [
             { ...u, initials: u.initials || initialsOf(u.name), job: '—' },
             ...list,
           ])}
