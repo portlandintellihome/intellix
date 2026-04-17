@@ -1,17 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { apiGet } from './lib/api'
+import { colorForInitials } from './lib/color'
 
-const teamColors = {
-  JD: '#0066cc', MR: '#34c759', SW: '#534AB7', AL: '#ff9500'
-}
-
-const JOBS = [
-  { id: 1, name: 'Lakeside Residence', client: 'Johnson Family', clientId: 1, portalId: 'PRT-1035', assigned: ['JD', 'MR'], color: '#0066cc', start: { month: 3, day: 13 }, end: { month: 3, day: 17 }, status: 'On site' },
-  { id: 2, name: 'Downtown Penthouse', client: 'Rivera LLC', clientId: 2, portalId: 'PRT-1040', assigned: ['SW'], color: '#534AB7', start: { month: 3, day: 11 }, end: { month: 3, day: 18 }, status: 'In progress' },
-  { id: 3, name: 'Hillcrest Estate', client: 'Chen Family', clientId: 3, portalId: 'PRT-1037', assigned: ['JD'], color: '#ff9500', start: { month: 3, day: 8 }, end: { month: 3, day: 16 }, status: 'Review' },
-  { id: 4, name: 'Thompson Residence', client: 'Thompson Family', clientId: 4, portalId: 'PRT-1039', assigned: ['MR', 'SW'], color: '#34c759', start: { month: 3, day: 22 }, end: { month: 3, day: 24 }, status: 'Scheduled' },
-  { id: 5, name: 'Martinez Family', client: 'Martinez Family', clientId: 5, portalId: 'PRT-1042', assigned: ['MR'], color: '#ff3b30', start: { month: 3, day: 28 }, end: { month: 4, day: 2 }, status: 'Scheduled' },
-]
+const PALETTE = ['#0066cc', '#34c759', '#534AB7', '#ff9500', '#ff3b30']
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
@@ -33,13 +25,13 @@ function jobOnDay(job, day, month) {
 
 function Avatar({ initials, size = 20 }) {
   return (
-    <div style={{ width: size, height: size, minWidth: size, borderRadius: '50%', background: teamColors[initials] || '#6e6e73', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.4, fontWeight: 700, color: '#fff' }}>
+    <div style={{ width: size, height: size, minWidth: size, borderRadius: '50%', background: colorForInitials(initials), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.4, fontWeight: 700, color: '#fff' }}>
       {initials}
     </div>
   )
 }
 
-function NewJobModal({ onClose, selectedDate }) {
+function NewJobModal({ onClose, selectedDate, team }) {
   const [form, setForm] = useState({ name: '', client: '', start: selectedDate || '', end: '', assigned: [], notes: '' })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const toggleAssign = (i) => setForm(f => ({ ...f, assigned: f.assigned.includes(i) ? f.assigned.filter(a => a !== i) : [...f.assigned, i] }))
@@ -55,11 +47,11 @@ function NewJobModal({ onClose, selectedDate }) {
         <div style={{ padding: '18px 22px' }}>
           <div style={{ marginBottom: 12 }}>
             <div style={lbl}>Job name</div>
-            <input style={inp} placeholder="e.g. Lakeside Residence" value={form.name} onChange={e => set('name', e.target.value)} />
+            <input style={inp} placeholder="Job name" value={form.name} onChange={e => set('name', e.target.value)} />
           </div>
           <div style={{ marginBottom: 12 }}>
             <div style={lbl}>Client</div>
-            <input style={inp} placeholder="e.g. Johnson Family" value={form.client} onChange={e => set('client', e.target.value)} />
+            <input style={inp} placeholder="Client name" value={form.client} onChange={e => set('client', e.target.value)} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -73,13 +65,20 @@ function NewJobModal({ onClose, selectedDate }) {
           </div>
           <div style={{ marginBottom: 12 }}>
             <div style={lbl}>Assign team</div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-              {Object.entries(teamColors).map(([initials]) => (
-                <div key={initials} onClick={() => toggleAssign(initials)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 7, border: `1px solid ${form.assigned.includes(initials) ? teamColors[initials] : 'var(--border)'}`, background: form.assigned.includes(initials) ? `${teamColors[initials]}18` : 'transparent', cursor: 'pointer' }}>
-                  <Avatar initials={initials} size={20} />
-                  <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text)' }}>{initials}</span>
-                </div>
-              ))}
+            <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+              {team.length === 0 && (
+                <span style={{ fontSize: 11, color: 'var(--text3)' }}>No team members yet — invite some from the Team page.</span>
+              )}
+              {team.map(m => {
+                const color = colorForInitials(m.initials)
+                const selected = form.assigned.includes(m.initials)
+                return (
+                  <div key={m.id} onClick={() => toggleAssign(m.initials)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 7, border: `1px solid ${selected ? color : 'var(--border)'}`, background: selected ? `${color}18` : 'transparent', cursor: 'pointer' }}>
+                    <Avatar initials={m.initials} size={20} />
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text)' }}>{m.initials}</span>
+                  </div>
+                )
+              })}
             </div>
           </div>
           <div>
@@ -106,6 +105,34 @@ export default function CalendarPage() {
   const [showNew, setShowNew] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
   const [selectedJob, setSelectedJob] = useState(null)
+  const [jobs, setJobs] = useState([])
+  const [team, setTeam] = useState([])
+
+  useEffect(() => {
+    Promise.all([
+      apiGet('/api/jobs').catch(() => []),
+      apiGet('/api/team').catch(() => []),
+    ]).then(([jobRows, teamRows]) => {
+      setJobs(jobRows.map(j => {
+        const s = j.start_date ? new Date(j.start_date) : null
+        const e = j.end_date ? new Date(j.end_date) : null
+        const assigned = Array.isArray(j.assigned) ? j.assigned : []
+        return {
+          ...j,
+          start: s ? { month: s.getMonth(), day: s.getDate() } : null,
+          end: e ? { month: e.getMonth(), day: e.getDate() } : null,
+          client: j.client_name || '',
+          assigned,
+          color: colorForInitials(assigned[0]) || PALETTE[0],
+          portalId: j.portal_id || '',
+          clientId: j.client_id,
+        }
+      }).filter(j => j.start && j.end))
+      setTeam(teamRows)
+    })
+  }, [])
+
+  const JOBS = jobs
 
   const daysInMonth = getDaysInMonth(currentMonth, currentYear)
   const firstDay = getFirstDayOfMonth(currentMonth, currentYear)
@@ -134,7 +161,7 @@ export default function CalendarPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-      {showNew && <NewJobModal onClose={() => setShowNew(false)} selectedDate={selectedDate} />}
+      {showNew && <NewJobModal onClose={() => setShowNew(false)} selectedDate={selectedDate} team={team} />}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -279,6 +306,9 @@ export default function CalendarPage() {
       )}
 
       <div style={{ padding: '10px 24px', borderTop: '1px solid var(--border2)', background: 'var(--bg2)', display: 'flex', gap: 16, flexWrap: 'wrap', flexShrink: 0 }}>
+        {JOBS.length === 0 && (
+          <span style={{ fontSize: 10.5, color: 'var(--text3)', fontWeight: 500 }}>No jobs scheduled — schedule one to see it here.</span>
+        )}
         {JOBS.map(job => (
           <div key={job.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: job.color }} />

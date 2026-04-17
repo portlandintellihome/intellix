@@ -1,35 +1,25 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { apiGet } from './lib/api'
+import { colorForInitials, initialsOf } from './lib/color'
 
-const STATS = [
-  { label: 'Jobs completed', value: '12', sub: 'this month', delta: '+3 vs last month', up: true, color: '#34c759' },
-  { label: 'Revenue', value: '$184k', sub: 'this month', delta: '+$22k vs last month', up: true, color: '#0066cc' },
-  { label: 'Avg job duration', value: '6.4d', sub: 'across 12 jobs', delta: '-0.8d vs last month', up: true, color: '#534AB7' },
-  { label: 'Team utilization', value: '78%', sub: '4 active members', delta: '+5% vs last month', up: true, color: '#ff9500' },
-]
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-const JOBS_PER_MONTH = [
-  { month: 'Nov', count: 7,  revenue: 92 },
-  { month: 'Dec', count: 5,  revenue: 68 },
-  { month: 'Jan', count: 8,  revenue: 110 },
-  { month: 'Feb', count: 9,  revenue: 138 },
-  { month: 'Mar', count: 9,  revenue: 162 },
-  { month: 'Apr', count: 12, revenue: 184 },
-]
-
-const REVENUE_BY_CATEGORY = [
-  { label: 'Full home AV',      value: 82, color: '#0066cc' },
-  { label: 'Lighting control',  value: 41, color: '#534AB7' },
-  { label: 'Network / WiFi',    value: 28, color: '#34c759' },
-  { label: 'Service & repair',  value: 19, color: '#ff9500' },
-  { label: 'Other',             value: 14, color: '#aeaeb2' },
-]
-
-const TEAM_UTIL = [
-  { initials: 'JD', name: 'John D.',  pct: 92, color: '#0066cc' },
-  { initials: 'SW', name: 'Sam W.',   pct: 84, color: '#534AB7' },
-  { initials: 'MR', name: 'Mike R.',  pct: 71, color: '#34c759' },
-  { initials: 'AL', name: 'Amy L.',   pct: 65, color: '#ff9500' },
-]
+function buildJobsPerMonth(jobs) {
+  const now = new Date()
+  const buckets = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    buckets.push({ key: `${d.getFullYear()}-${d.getMonth()}`, month: MONTH_NAMES[d.getMonth()], count: 0, revenue: 0 })
+  }
+  const index = Object.fromEntries(buckets.map((b, i) => [b.key, i]))
+  for (const j of jobs) {
+    if (!j.start_date) continue
+    const d = new Date(j.start_date)
+    const k = `${d.getFullYear()}-${d.getMonth()}`
+    if (k in index) buckets[index[k]].count += 1
+  }
+  return buckets
+}
 
 const RANGES = ['30 days', '90 days', '12 months', 'YTD']
 
@@ -136,6 +126,42 @@ function TeamUtilRow({ member }) {
 
 export default function Reporting() {
   const [range, setRange] = useState('30 days')
+  const [jobs, setJobs] = useState([])
+  const [team, setTeam] = useState([])
+
+  useEffect(() => {
+    Promise.all([
+      apiGet('/api/jobs').catch(() => []),
+      apiGet('/api/team').catch(() => []),
+    ]).then(([j, t]) => {
+      setJobs(j)
+      setTeam(t)
+    })
+  }, [])
+
+  const now = new Date()
+  const thisMonthJobs = jobs.filter(j => {
+    if (!j.start_date) return false
+    const d = new Date(j.start_date)
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+  })
+  const completedThisMonth = thisMonthJobs.filter(j => j.status === 'Complete').length
+
+  const STATS = [
+    { label: 'Jobs completed', value: String(completedThisMonth), sub: 'this month', delta: completedThisMonth === 0 ? 'No data yet' : `${thisMonthJobs.length} started`, up: true, color: '#34c759' },
+    { label: 'Revenue', value: '$0', sub: 'this month', delta: 'Tracking not enabled', up: true, color: '#0066cc' },
+    { label: 'Avg job duration', value: '—', sub: `across ${jobs.length} jobs`, delta: 'Tracking not enabled', up: true, color: '#534AB7' },
+    { label: 'Team utilization', value: '0%', sub: `${team.length} member${team.length === 1 ? '' : 's'}`, delta: 'Tracking not enabled', up: true, color: '#ff9500' },
+  ]
+
+  const JOBS_PER_MONTH = buildJobsPerMonth(jobs)
+  const REVENUE_BY_CATEGORY = []
+  const TEAM_UTIL = team.map(m => ({
+    initials: m.initials || initialsOf(m.name),
+    name: m.name,
+    pct: 0,
+    color: colorForInitials(m.initials || initialsOf(m.name)),
+  }))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
@@ -161,17 +187,24 @@ export default function Reporting() {
               <div style={s.cardTitle}>Jobs per month</div>
               <div style={{ fontSize: 11, color: 'var(--text3)' }}>Last 6 months</div>
             </div>
-            <BarChart data={JOBS_PER_MONTH} />
+            {JOBS_PER_MONTH.every(b => b.count === 0)
+              ? <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 12 }}>No jobs recorded yet.</div>
+              : <BarChart data={JOBS_PER_MONTH} />}
           </div>
 
           <div style={s.card}>
             <div style={s.cardTitle}>Revenue by category</div>
-            <RevenueBreakdown data={REVENUE_BY_CATEGORY} />
+            {REVENUE_BY_CATEGORY.length === 0
+              ? <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text3)', fontSize: 12 }}>No revenue yet.</div>
+              : <RevenueBreakdown data={REVENUE_BY_CATEGORY} />}
           </div>
         </div>
 
         <div style={s.card}>
           <div style={s.cardTitle}>Team utilization</div>
+          {TEAM_UTIL.length === 0 && (
+            <div style={{ padding: '16px 0', color: 'var(--text3)', fontSize: 12 }}>No team members tracked yet.</div>
+          )}
           {TEAM_UTIL.map((m, i) => (
             <div key={m.initials} style={i === TEAM_UTIL.length - 1 ? { marginBottom: -10 } : undefined}>
               <TeamUtilRow member={m} />

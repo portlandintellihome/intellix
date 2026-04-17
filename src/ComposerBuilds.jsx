@@ -1,38 +1,5 @@
-import { useState } from 'react'
-
-const EXISTING_JOBS = [
-  { id: 1, name: 'Lakeside Residence', client: 'Johnson Family' },
-  { id: 2, name: 'Downtown Penthouse', client: 'Rivera LLC' },
-  { id: 3, name: 'Hillcrest Estate', client: 'Chen Family' },
-  { id: 4, name: 'Thompson Residence', client: 'Thompson Family' },
-]
-
-const DRIVERS = [
-  { name: 'Sony Bravia TV (IP)', cat: 'AV', conn: 'IP', file: 'sony_bravia_ip.c4z' },
-  { name: 'Samsung TV (IP)', cat: 'AV', conn: 'IP', file: 'samsung_tv_ip.c4z' },
-  { name: 'LG TV (IP)', cat: 'AV', conn: 'IP', file: 'lg_tv_ip.c4z' },
-  { name: 'Apple TV 4K', cat: 'AV', conn: 'IP', file: 'apple_tv_4k.c4z' },
-  { name: 'Denon AVR (IP)', cat: 'AV', conn: 'IP', file: 'denon_avr_ip.c4z' },
-  { name: 'Yamaha AVR (IP)', cat: 'AV', conn: 'IP', file: 'yamaha_avr_ip.c4z' },
-  { name: 'Sonos (IP)', cat: 'Audio', conn: 'IP', file: 'sonos_ip.c4z' },
-  { name: 'Triad One Streamer', cat: 'Audio', conn: 'IP', file: 'triad_one.c4z' },
-  { name: 'Triad Matrix Amp', cat: 'Audio', conn: 'IP', file: 'triad_matrix.c4z' },
-  { name: 'Lutron RadioRA 3', cat: 'Lighting', conn: 'IP', file: 'lutron_radiora3.c4z' },
-  { name: 'Lutron Caseta Pro', cat: 'Lighting', conn: 'IP', file: 'lutron_caseta_pro.c4z' },
-  { name: 'Ketra Lighting', cat: 'Lighting', conn: 'IP', file: 'ketra.c4z' },
-  { name: 'Control4 Dimmer', cat: 'Lighting', conn: 'Zigbee', file: 'c4_dimmer.c4z' },
-  { name: 'Ecobee Thermostat', cat: 'HVAC', conn: 'IP', file: 'ecobee.c4z' },
-  { name: 'Nest Thermostat', cat: 'HVAC', conn: 'IP', file: 'nest.c4z' },
-  { name: 'Honeywell T6 Pro', cat: 'HVAC', conn: 'IP', file: 'honeywell_t6.c4z' },
-  { name: 'DSC Security Panel', cat: 'Security', conn: 'RS232', file: 'dsc_panel.c4z' },
-  { name: 'Alarm.com', cat: 'Security', conn: 'IP', file: 'alarm_com.c4z' },
-  { name: 'Liftmaster MyQ', cat: 'Security', conn: 'IP', file: 'liftmaster_myq.c4z' },
-  { name: 'Araknis Switch', cat: 'Network', conn: 'IP', file: 'araknis_switch.c4z' },
-  { name: 'Ubiquiti UniFi', cat: 'Network', conn: 'IP', file: 'ubiquiti_unifi.c4z' },
-  { name: 'Pakedge Router', cat: 'Network', conn: 'IP', file: 'pakedge_router.c4z' },
-  { name: 'Lutron Sivoia QS', cat: 'Shades', conn: 'IP', file: 'lutron_sivoia.c4z' },
-  { name: 'Hunter Douglas', cat: 'Shades', conn: 'IP', file: 'hunter_douglas.c4z' },
-]
+import { useState, useEffect } from 'react'
+import { apiGet } from './lib/api'
 
 const DRIVER_CATS = ['All', 'AV', 'Audio', 'Lighting', 'HVAC', 'Security', 'Network', 'Shades']
 
@@ -100,7 +67,9 @@ function generateChecklist(form) {
   return phases
 }
 
-function BuildForm({ onGenerate }) {
+function BuildForm({ onGenerate, existingJobs, drivers }) {
+  const EXISTING_JOBS = existingJobs
+  const DRIVERS = drivers
   const [form, setForm] = useState({
     projectName: '', client: '', linkedJob: '', controller: '',
     ovrc: '', version: '', installer: '',
@@ -141,8 +110,8 @@ function BuildForm({ onGenerate }) {
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '16px', marginBottom: 14 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 14 }}>Project information</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div><div style={lbl}>Project name</div><input style={inp} placeholder="e.g. Lakeside Residence" value={form.projectName} onChange={e => set('projectName', e.target.value)} /></div>
-              <div><div style={lbl}>Client name</div><input style={inp} placeholder="e.g. Johnson Family" value={form.client} onChange={e => set('client', e.target.value)} /></div>
+              <div><div style={lbl}>Project name</div><input style={inp} placeholder="Project name" value={form.projectName} onChange={e => set('projectName', e.target.value)} /></div>
+              <div><div style={lbl}>Client name</div><input style={inp} placeholder="Client name" value={form.client} onChange={e => set('client', e.target.value)} /></div>
             </div>
             <div style={{ marginBottom: 12 }}>
               <div style={lbl}>Link to existing job (optional)</div>
@@ -163,8 +132,8 @@ function BuildForm({ onGenerate }) {
               <div><div style={lbl}>Date</div><input style={inp} type="date" value={form.date} onChange={e => set('date', e.target.value)} /></div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div><div style={lbl}>Installer</div><input style={inp} placeholder="e.g. John D." value={form.installer} onChange={e => set('installer', e.target.value)} /></div>
-              <div><div style={lbl}>OVRC site name</div><input style={inp} placeholder="e.g. Lakeside-Site-01" value={form.ovrc} onChange={e => set('ovrc', e.target.value)} /></div>
+              <div><div style={lbl}>Installer</div><input style={inp} placeholder="Installer name" value={form.installer} onChange={e => set('installer', e.target.value)} /></div>
+              <div><div style={lbl}>OVRC site name</div><input style={inp} placeholder="OVRC site identifier" value={form.ovrc} onChange={e => set('ovrc', e.target.value)} /></div>
             </div>
           </div>
 
@@ -344,16 +313,31 @@ function BuildChecklist({ form, checklist, onBack }) {
   )
 }
 
-const SAVED_BUILDS = [
-  { id: 1, name: 'Lakeside Residence', client: 'Johnson Family', date: 'Apr 13 2026', progress: 85, phases: 7 },
-  { id: 2, name: 'Downtown Penthouse', client: 'Rivera LLC', date: 'Apr 11 2026', progress: 42, phases: 6 },
-  { id: 3, name: 'Hillcrest Estate', client: 'Chen Family', date: 'Apr 8 2026', progress: 100, phases: 8 },
-]
-
 export default function ComposerBuilds() {
   const [view, setView] = useState('list')
   const [form, setForm] = useState(null)
   const [checklist, setChecklist] = useState(null)
+  const [savedBuilds, setSavedBuilds] = useState([])
+  const [existingJobs, setExistingJobs] = useState([])
+  const [drivers, setDrivers] = useState([])
+
+  useEffect(() => {
+    Promise.all([
+      apiGet('/api/composer-builds').catch(() => []),
+      apiGet('/api/jobs').catch(() => []),
+      apiGet('/api/drivers').catch(() => []),
+    ]).then(([builds, jobs, drvs]) => {
+      setSavedBuilds(builds.map(b => ({
+        ...b,
+        client: b.client_name || '',
+        date: b.build_date ? new Date(b.build_date).toLocaleDateString() : '',
+      })))
+      setExistingJobs(jobs.map(j => ({ ...j, client: j.client_name || '' })))
+      setDrivers(drvs.map(d => ({ ...d, cat: d.category, conn: d.connection, file: d.filename })))
+    })
+  }, [])
+
+  const SAVED_BUILDS = savedBuilds
 
   const handleGenerate = (formData) => {
     setForm(formData)
@@ -386,6 +370,13 @@ export default function ComposerBuilds() {
               </div>
             ))}
           </div>
+          {SAVED_BUILDS.length === 0 && (
+            <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>No build docs yet</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 14 }}>Generate your first Composer Pro build checklist.</div>
+              <button onClick={() => setView('form')} style={{ ...primaryBtn, fontSize: 12 }}>+ New build doc</button>
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {SAVED_BUILDS.map(build => (
               <div key={build.id} onClick={() => setView('form')} style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 11, padding: '14px 16px', cursor: 'pointer', transition: 'all 0.12s' }}>
@@ -408,7 +399,7 @@ export default function ComposerBuilds() {
         </div>
       )}
 
-      {view === 'form' && <BuildForm onGenerate={handleGenerate} />}
+      {view === 'form' && <BuildForm onGenerate={handleGenerate} existingJobs={existingJobs} drivers={drivers} />}
       {view === 'checklist' && form && checklist && <BuildChecklist form={form} checklist={checklist} onBack={() => setView('form')} />}
     </div>
   )

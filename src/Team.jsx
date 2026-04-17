@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { apiGet } from './lib/api'
-
-const teamColors = { JD: '#0066cc', MR: '#34c759', SW: '#534AB7', AL: '#ff9500' }
-const fallbackColors = ['#0066cc', '#34c759', '#534AB7', '#ff9500', '#ff3b30']
+import { colorForInitials, initialsOf } from './lib/color'
 
 const statusStyle = {
   'On site':   { bg: 'rgba(52,199,89,0.09)',  color: '#248a3d', dot: '#34c759' },
@@ -19,16 +17,7 @@ const inp = { width: '100%', background: 'var(--bg3)', border: '1px solid var(--
 const primaryBtn = { padding: '8px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#1d1d1f', color: '#fff', fontFamily: 'var(--font)' }
 const ghostBtn = { padding: '8px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontFamily: 'var(--font)' }
 
-function initialsOf(name) {
-  return name.trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?'
-}
-
-function colorFor(initials) {
-  if (teamColors[initials]) return teamColors[initials]
-  let h = 0
-  for (const c of initials) h = (h * 31 + c.charCodeAt(0)) >>> 0
-  return fallbackColors[h % fallbackColors.length]
-}
+const colorFor = colorForInitials
 
 function StatusBadge({ status }) {
   const st = statusStyle[status] || { bg: 'var(--bg4)', color: 'var(--text2)', dot: 'var(--text3)' }
@@ -146,7 +135,7 @@ function InviteEmployeeModal({ onClose, onInvited }) {
             <div style={{ padding: '18px 22px' }}>
               <div style={{ marginBottom: 12 }}>
                 <div style={lbl}>Full name</div>
-                <input style={inp} placeholder="e.g. John Davis" value={form.name} onChange={e => set('name', e.target.value)} />
+                <input style={inp} placeholder="Full name" value={form.name} onChange={e => set('name', e.target.value)} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                 <div>
@@ -252,9 +241,17 @@ export default function Team() {
           })}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-          {employees.map(emp => <EmployeeCard key={emp.id} emp={emp} />)}
-        </div>
+        {employees.length === 0 ? (
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>No team members yet</div>
+            <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 14 }}>Invite your first teammate to set them up with a login.</div>
+            <button onClick={() => setShowModal(true)} style={primaryBtn}>+ Invite employee</button>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+            {employees.map(emp => <EmployeeCard key={emp.id} emp={emp} />)}
+          </div>
+        )}
       </div>
 
       {showModal && (

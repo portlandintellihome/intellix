@@ -2,24 +2,24 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const CHECKLIST = [
-  { id: 'company',      label: 'Add company info',              detail: 'Name, address, phone, and business hours',       done: true,  path: null,              cta: null },
+  { id: 'company',      label: 'Add company info',              detail: 'Name, address, phone, and business hours',       done: false, path: null,              cta: 'Fill in below' },
   { id: 'logo',         label: 'Upload company logo',           detail: 'Appears on proposals and client portals',         done: false, path: null,              cta: 'Upload' },
   { id: 'anthropic',    label: 'Connect Anthropic API',         detail: 'Powers Intellix Assist',                           done: false, path: '/integrations',   cta: 'Connect' },
   { id: 'ovrc',         label: 'Connect OVRC',                  detail: 'Remote monitoring of client devices',              done: false, path: '/integrations',   cta: 'Connect' },
   { id: 'portal',       label: 'Connect Portal.io',             detail: 'Proposal sending and tracking via Zapier',         done: false, path: '/integrations',   cta: 'Connect' },
-  { id: 'team',         label: 'Add your first employee',       detail: 'Installers, programmers, and office staff',        done: true,  path: '/team',           cta: 'View team' },
+  { id: 'team',         label: 'Add your first employee',       detail: 'Installers, programmers, and office staff',        done: false, path: '/team',           cta: 'Invite' },
   { id: 'invite',       label: 'Invite the rest of your team',  detail: 'Send login invites so everyone can collaborate',   done: false, path: '/team',           cta: 'Invite' },
-  { id: 'client',       label: 'Add your first client',         detail: 'Start tracking jobs, proposals, and tickets',      done: true,  path: '/clients',        cta: 'View clients' },
+  { id: 'client',       label: 'Add your first client',         detail: 'Start tracking jobs, proposals, and tickets',      done: false, path: '/clients',        cta: 'Add client' },
   { id: 'proposal',     label: 'Send your first proposal',      detail: 'Portal.io connection required',                    done: false, path: '/jobs',           cta: 'New proposal' },
 ]
 
 const DEFAULT_COMPANY = {
-  name: 'Acme AV',
-  legalName: 'Acme Audio Visual, LLC',
-  phone: '(503) 555-0100',
-  email: 'hello@acmeav.com',
-  website: 'acmeav.com',
-  address: '1200 NW Marshall St, Portland OR 97209',
+  name: '',
+  legalName: '',
+  phone: '',
+  email: '',
+  website: '',
+  address: '',
   timezone: 'America/Los_Angeles',
   currency: 'USD',
   taxRate: '0',
@@ -225,36 +225,18 @@ function IntegrationsSummary({ navigate }) {
 }
 
 function TeamSummary({ navigate }) {
-  const team = [
-    { initials: 'JD', name: 'John Davis', role: 'Installer',  color: '#0066cc', invited: true },
-    { initials: 'SW', name: 'Sam Wright', role: 'Programmer', color: '#534AB7', invited: true },
-    { initials: 'MR', name: 'Mike Reyes', role: 'Installer',  color: '#34c759', invited: false },
-    { initials: 'AL', name: 'Amy Liu',    role: 'Admin',      color: '#ff9500', invited: false },
-  ]
-  const invited = team.filter(t => t.invited).length
-
   return (
     <div style={s.card}>
       <div style={s.cardHeader}>
         <div>
           <div style={s.cardHeaderTitle}>Team setup</div>
-          <div style={s.cardHeaderSub}>{team.length} members added · {invited} invited to log in</div>
+          <div style={s.cardHeaderSub}>No team members added yet</div>
         </div>
         <button onClick={() => navigate('/team')} style={ghostBtn}>Manage team →</button>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {team.map((m, i) => (
-          <div key={m.initials} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i === team.length - 1 ? 'none' : '1px solid var(--border2)' }}>
-            <div style={{ width: 30, height: 30, minWidth: 30, borderRadius: '50%', background: m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff' }}>{m.initials}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>{m.name}</div>
-              <div style={{ fontSize: 11, color: 'var(--text3)' }}>{m.role}</div>
-            </div>
-            {m.invited
-              ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 5, fontSize: 10.5, fontWeight: 700, background: 'rgba(52,199,89,0.09)', color: '#248a3d' }}>Invited</span>
-              : <button onClick={() => navigate('/team')} style={linkBtn}>Send invite</button>}
-          </div>
-        ))}
+      <div style={{ textAlign: 'center', padding: '24px 0 8px' }}>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>Invite your first teammate to get started.</div>
+        <button onClick={() => navigate('/team')} style={linkBtn}>Invite employee</button>
       </div>
     </div>
   )

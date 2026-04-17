@@ -86,6 +86,31 @@ CREATE TABLE IF NOT EXISTS inventory (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS drivers (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  category TEXT,
+  connection TEXT,
+  filename TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS proposals (
+  id SERIAL PRIMARY KEY,
+  client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+  portal_id TEXT,
+  address TEXT,
+  scope TEXT,
+  devices TEXT,
+  rooms INTEGER,
+  labor NUMERIC(12,2),
+  materials NUMERIC(12,2),
+  total NUMERIC(12,2),
+  status TEXT DEFAULT 'Draft',
+  assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS composer_builds (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,

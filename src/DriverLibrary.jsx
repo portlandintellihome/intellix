@@ -1,31 +1,5 @@
-import { useState } from 'react'
-
-const DRIVERS = [
-  { id: 1, name: 'Sony Bravia TV (IP)', cat: 'AV', conn: 'IP', file: 'sony_bravia_ip.c4z', added: 'Mar 12 2026' },
-  { id: 2, name: 'Samsung TV (IP)', cat: 'AV', conn: 'IP', file: 'samsung_tv_ip.c4z', added: 'Mar 12 2026' },
-  { id: 3, name: 'LG TV (IP)', cat: 'AV', conn: 'IP', file: 'lg_tv_ip.c4z', added: 'Mar 12 2026' },
-  { id: 4, name: 'Apple TV 4K', cat: 'AV', conn: 'IP', file: 'apple_tv_4k.c4z', added: 'Mar 14 2026' },
-  { id: 5, name: 'Denon AVR (IP)', cat: 'AV', conn: 'IP', file: 'denon_avr_ip.c4z', added: 'Feb 28 2026' },
-  { id: 6, name: 'Yamaha AVR (IP)', cat: 'AV', conn: 'IP', file: 'yamaha_avr_ip.c4z', added: 'Feb 28 2026' },
-  { id: 7, name: 'Sonos (IP)', cat: 'Audio', conn: 'IP', file: 'sonos_ip.c4z', added: 'Jan 10 2026' },
-  { id: 8, name: 'Triad One Streamer', cat: 'Audio', conn: 'IP', file: 'triad_one.c4z', added: 'Jan 10 2026' },
-  { id: 9, name: 'Triad Matrix Amp', cat: 'Audio', conn: 'IP', file: 'triad_matrix.c4z', added: 'Jan 10 2026' },
-  { id: 10, name: 'Lutron RadioRA 3', cat: 'Lighting', conn: 'IP', file: 'lutron_radiora3.c4z', added: 'Dec 5 2025' },
-  { id: 11, name: 'Lutron Caseta Pro', cat: 'Lighting', conn: 'IP', file: 'lutron_caseta_pro.c4z', added: 'Dec 5 2025' },
-  { id: 12, name: 'Ketra Lighting', cat: 'Lighting', conn: 'IP', file: 'ketra.c4z', added: 'Feb 1 2026' },
-  { id: 13, name: 'Control4 Dimmer', cat: 'Lighting', conn: 'Zigbee', file: 'c4_dimmer.c4z', added: 'Nov 20 2025' },
-  { id: 14, name: 'Ecobee Thermostat', cat: 'HVAC', conn: 'IP', file: 'ecobee.c4z', added: 'Jan 15 2026' },
-  { id: 15, name: 'Nest Thermostat', cat: 'HVAC', conn: 'IP', file: 'nest.c4z', added: 'Jan 15 2026' },
-  { id: 16, name: 'Honeywell T6 Pro', cat: 'HVAC', conn: 'IP', file: 'honeywell_t6.c4z', added: 'Jan 15 2026' },
-  { id: 17, name: 'DSC Security Panel', cat: 'Security', conn: 'RS232', file: 'dsc_panel.c4z', added: 'Mar 1 2026' },
-  { id: 18, name: 'Alarm.com', cat: 'Security', conn: 'IP', file: 'alarm_com.c4z', added: 'Mar 1 2026' },
-  { id: 19, name: 'Liftmaster MyQ', cat: 'Security', conn: 'IP', file: 'liftmaster_myq.c4z', added: 'Mar 1 2026' },
-  { id: 20, name: 'Araknis Switch', cat: 'Network', conn: 'IP', file: 'araknis_switch.c4z', added: 'Nov 10 2025' },
-  { id: 21, name: 'Ubiquiti UniFi', cat: 'Network', conn: 'IP', file: 'ubiquiti_unifi.c4z', added: 'Nov 10 2025' },
-  { id: 22, name: 'Pakedge Router', cat: 'Network', conn: 'IP', file: 'pakedge_router.c4z', added: 'Nov 10 2025' },
-  { id: 23, name: 'Lutron Sivoia QS', cat: 'Shades', conn: 'IP', file: 'lutron_sivoia.c4z', added: 'Feb 20 2026' },
-  { id: 24, name: 'Hunter Douglas', cat: 'Shades', conn: 'IP', file: 'hunter_douglas.c4z', added: 'Feb 20 2026' },
-]
+import { useState, useEffect } from 'react'
+import { apiGet } from './lib/api'
 
 const CATS = ['All', 'AV', 'Audio', 'Lighting', 'HVAC', 'Security', 'Network', 'Shades']
 
@@ -106,6 +80,21 @@ export default function DriverLibrary() {
   const [cat, setCat] = useState('All')
   const [showUpload, setShowUpload] = useState(false)
   const [selected, setSelected] = useState(null)
+  const [drivers, setDrivers] = useState([])
+
+  useEffect(() => {
+    apiGet('/api/drivers')
+      .then(rows => setDrivers(rows.map(d => ({
+        ...d,
+        cat: d.category,
+        conn: d.connection,
+        file: d.filename,
+        added: d.created_at ? new Date(d.created_at).toLocaleDateString() : '',
+      }))))
+      .catch(err => console.error('Failed to load drivers', err))
+  }, [])
+
+  const DRIVERS = drivers
 
   const filtered = DRIVERS.filter(d => {
     const matchCat = cat === 'All' || d.cat === cat
@@ -157,6 +146,13 @@ export default function DriverLibrary() {
               <div key={h} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{h}</div>
             ))}
           </div>
+          {filtered.length === 0 && (
+            <div style={{ padding: '40px 24px', textAlign: 'center' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>No drivers uploaded</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 14 }}>Upload your first .c4z driver to build its shelf.</div>
+              <button onClick={() => setShowUpload(true)} style={{ ...primaryBtn, fontSize: 12 }}>+ Upload driver</button>
+            </div>
+          )}
           {filtered.map((driver, i) => (
             <div key={driver.id} onClick={() => setSelected(selected?.id === driver.id ? null : driver)} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', padding: '11px 16px', borderBottom: i < filtered.length - 1 ? '1px solid var(--border2)' : 'none', alignItems: 'center', cursor: 'pointer', background: selected?.id === driver.id ? 'rgba(0,102,204,0.04)' : 'transparent', transition: 'background 0.1s' }}>
               <div>

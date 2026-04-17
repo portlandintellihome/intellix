@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { apiGet } from './lib/api'
+import { colorForInitials, initialsOf } from './lib/color'
 
 const quickActions = [
   { label: 'New job', path: '/jobs', color: '#1d1d1f' },
@@ -7,45 +10,18 @@ const quickActions = [
   { label: 'New proposal', path: '/jobs', color: '#534AB7' },
 ]
 
-const stats = [
-  { label: 'Active jobs', value: '3', sub: '2 on site today', color: '#0066cc' },
-  { label: 'Open tickets', value: '5', sub: '2 urgent', color: '#ff3b30' },
-  { label: 'Build docs', value: '8', sub: 'this month', color: '#34c759' },
-  { label: 'Team available', value: '2', sub: 'of 4 members', color: '#ff9500' },
-]
+const messages = []
+const activity = []
 
-const jobs = [
-  { name: 'Lakeside Residence', client: 'Johnson Family', phase: 'Installation', assigned: 'JD / MR', status: 'On site', color: '#34c759' },
-  { name: 'Downtown Penthouse', client: 'Rivera LLC', phase: 'Programming', assigned: 'SW', status: 'In progress', color: '#0066cc' },
-  { name: 'Hillcrest Estate', client: 'Chen Family', phase: 'Sign-off', assigned: 'JD', status: 'Review', color: '#ff9500' },
-]
-
-const tickets = [
-  { client: 'Park Realty', issue: 'Living room TV not responding', age: '2h ago', urgent: true },
-  { client: 'Apex Corp', issue: 'Thermostat offline after update', age: '1d ago', urgent: true },
-  { client: 'Johnson Family', issue: 'Add guest network access', age: '3d ago', urgent: false },
-]
-
-const messages = [
-  { client: 'Rivera LLC', msg: 'Can we add a scene for the patio?', time: '20m ago' },
-  { client: 'Chen Family', msg: 'What time will the team arrive tomorrow?', time: '1h ago' },
-  { client: 'Park Realty', msg: 'Invoice received, payment processing', time: '3h ago' },
-]
-
-const activity = [
-  { text: 'Lakeside Residence build doc generated — 8 rooms, 24 devices', time: '9:41am · JD', color: '#34c759' },
-  { text: 'Downtown Penthouse programming started in Composer Pro', time: '8:15am · SW', color: '#0066cc' },
-  { text: 'New service ticket — Park Realty TV issue', time: '7:30am', color: '#ff3b30' },
-  { text: 'Hillcrest Estate pushed to Director successfully', time: 'Yesterday · JD', color: '#34c759' },
-  { text: 'New proposal sent — Northgate Office', time: 'Yesterday · MR', color: '#534AB7' },
-]
-
-const team = [
-  { initials: 'JD', name: 'John D.', role: 'Installer', status: 'On site', job: 'Lakeside', color: '#34c759' },
-  { initials: 'SW', name: 'Sam W.', role: 'Programmer', status: 'Remote', job: 'Penthouse', color: '#0066cc' },
-  { initials: 'MR', name: 'Mike R.', role: 'Installer', status: 'Available', job: '—', color: '#ff9500' },
-  { initials: 'AL', name: 'Amy L.', role: 'Admin', status: 'Office', job: '—', color: '#534AB7' },
-]
+function relTime(iso) {
+  if (!iso) return ''
+  const diff = Date.now() - new Date(iso).getTime()
+  const h = Math.floor(diff / 3_600_000)
+  if (h < 1) return 'just now'
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  return `${d}d ago`
+}
 
 const s = {
   topbar: { display:'flex', alignItems:'center', justifyContent:'space-between', padding:'13px 24px', background:'var(--bg2)', borderBottom:'1px solid var(--border2)', flexShrink:0 },
@@ -72,6 +48,51 @@ const s = {
 export default function Dashboard({ setupDone }) {
   const navigate = useNavigate()
   const showBanner = !setupDone
+
+  const [jobs, setJobs] = useState([])
+  const [tickets, setTickets] = useState([])
+  const [team, setTeam] = useState([])
+  const [buildsCount, setBuildsCount] = useState(0)
+
+  useEffect(() => {
+    Promise.all([
+      apiGet('/api/jobs').catch(() => []),
+      apiGet('/api/tickets').catch(() => []),
+      apiGet('/api/team').catch(() => []),
+      apiGet('/api/composer-builds').catch(() => []),
+    ]).then(([j, t, tm, b]) => {
+      setJobs(j.map(x => ({
+        ...x,
+        client: x.client_name || '',
+        assigned: Array.isArray(x.assigned) ? x.assigned.join(' / ') : '',
+        color: colorForInitials(Array.isArray(x.assigned) ? x.assigned[0] : null),
+      })))
+      setTickets(t.map(x => ({
+        ...x,
+        client: x.client_name || '',
+        urgent: x.priority === 'Urgent',
+        age: relTime(x.created_at),
+      })))
+      setTeam(tm.map(m => ({
+        ...m,
+        initials: m.initials || initialsOf(m.name),
+        color: colorForInitials(m.initials || initialsOf(m.name)),
+        job: m.job || '—',
+      })))
+      setBuildsCount(b.length)
+    })
+  }, [])
+
+  const activeJobs = jobs.filter(j => j.status && j.status !== 'Complete' && j.status !== 'Scheduled')
+  const openTickets = tickets.filter(t => t.status !== 'Resolved')
+  const availableTeam = team.filter(m => m.status === 'Available' || m.status === 'On site' || m.status === 'Remote' || m.status === 'Office')
+
+  const stats = [
+    { label: 'Active jobs', value: String(activeJobs.length), sub: activeJobs.length === 0 ? 'no active jobs' : `${activeJobs.length} in progress`, color: '#0066cc' },
+    { label: 'Open tickets', value: String(openTickets.length), sub: openTickets.length === 0 ? 'no open tickets' : `${openTickets.filter(t => t.priority === 'Urgent').length} urgent`, color: '#ff3b30' },
+    { label: 'Build docs', value: String(buildsCount), sub: buildsCount === 0 ? 'no builds yet' : 'across all jobs', color: '#34c759' },
+    { label: 'Team available', value: String(availableTeam.length), sub: team.length === 0 ? 'no team members' : `of ${team.length} members`, color: '#ff9500' },
+  ]
 
   return (
     <div style={{ display:'flex', flexDirection:'column', flex:1, overflow:'hidden' }}>
@@ -131,6 +152,9 @@ export default function Dashboard({ setupDone }) {
           {/* ACTIVE JOBS */}
           <div style={s.card}>
             <div style={s.cardTitle}>Active jobs</div>
+            {jobs.length === 0 && (
+              <div style={{ fontSize: 11.5, color: 'var(--text3)', padding: '14px 0 4px' }}>No active jobs.</div>
+            )}
             {jobs.map((j, i) => (
               <div key={i} style={i < jobs.length - 1 ? s.row : s.rowLast}>
                 <div style={s.dot(j.color)} />
@@ -148,6 +172,9 @@ export default function Dashboard({ setupDone }) {
           {/* TEAM */}
           <div style={s.card}>
             <div style={s.cardTitle}>Team today</div>
+            {team.length === 0 && (
+              <div style={{ fontSize: 11.5, color: 'var(--text3)', padding: '14px 0 4px' }}>No team members yet.</div>
+            )}
             {team.map((m, i) => (
               <div key={i} style={i < team.length - 1 ? s.teamRow : s.teamRowLast}>
                 <div style={s.avatar(m.color)}>{m.initials}</div>
@@ -173,6 +200,9 @@ export default function Dashboard({ setupDone }) {
               <div style={s.cardTitle}>Open service tickets</div>
               <button onClick={() => navigate('/tickets')} style={{ fontSize:10.5, fontWeight:600, color:'var(--accent)', background:'none', border:'none', cursor:'pointer', fontFamily:'var(--font)' }}>View all</button>
             </div>
+            {tickets.length === 0 && (
+              <div style={{ fontSize: 11.5, color: 'var(--text3)', padding: '6px 0' }}>No open tickets.</div>
+            )}
             {tickets.map((t, i) => (
               <div key={i} style={i < tickets.length - 1 ? s.row : s.rowLast}>
                 <div style={s.dot(t.urgent ? '#ff3b30' : '#ff9500')} />
@@ -194,6 +224,9 @@ export default function Dashboard({ setupDone }) {
               <div style={s.cardTitle}>Client messages</div>
               <button onClick={() => navigate('/clients')} style={{ fontSize:10.5, fontWeight:600, color:'var(--accent)', background:'none', border:'none', cursor:'pointer', fontFamily:'var(--font)' }}>View all</button>
             </div>
+            {messages.length === 0 && (
+              <div style={{ fontSize: 11.5, color: 'var(--text3)', padding: '6px 0' }}>No new messages.</div>
+            )}
             {messages.map((m, i) => (
               <div key={i} style={i < messages.length - 1 ? s.row : s.rowLast}>
                 <div style={s.dot('#534AB7')} />
@@ -213,6 +246,9 @@ export default function Dashboard({ setupDone }) {
         {/* ACTIVITY */}
         <div style={s.card}>
           <div style={s.cardTitle}>Recent activity</div>
+          {activity.length === 0 && (
+            <div style={{ fontSize: 11.5, color: 'var(--text3)', padding: '6px 0' }}>No activity yet.</div>
+          )}
           {activity.map((a, i) => (
             <div key={i} style={i < activity.length - 1 ? s.row : s.rowLast}>
               <div style={s.dot(a.color)} />

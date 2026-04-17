@@ -1,14 +1,8 @@
 import { useState, useEffect } from 'react'
 import { apiGet } from './lib/api'
-
-const PROPOSALS = [
-  { id: 1, client: 'Martinez Family', address: '142 Oak Street, Portland OR', scope: 'Full home AV, lighting, HVAC control', devices: 'EA-5, 4x TVs, Lutron RadioRA3, Ecobee, Sonos', rooms: 6, labor: 2400, materials: 18500, total: 20900, status: 'Sent', created: 'Apr 14', assigned: 'MR', portalId: 'PRT-1042' },
-  { id: 2, client: 'Summit Properties', address: '800 Vista Blvd, Portland OR', scope: 'Conference room AV and lighting', devices: 'EA-3, 2x displays, Lutron Caseta', rooms: 3, labor: 1200, materials: 8400, total: 9600, status: 'Draft', created: 'Apr 13', assigned: 'AL', portalId: 'PRT-1041' },
-  { id: 3, client: 'Thompson Residence', address: '55 Pine Ave, Lake Oswego OR', scope: 'Multi-room audio and network', devices: 'EA-3, Sonos, Araknis network', rooms: 4, labor: 900, materials: 6200, total: 7100, status: 'Accepted', created: 'Apr 10', assigned: 'MR', portalId: 'PRT-1039' },
-]
+import { colorForInitials } from './lib/color'
 
 
-const teamColors = { JD: '#0066cc', MR: '#34c759', SW: '#534AB7', AL: '#ff9500' }
 
 const statusStyle = {
   Draft: { bg: 'rgba(174,174,178,0.12)', color: '#6e6e73' },
@@ -31,7 +25,7 @@ function Badge({ text }) {
 }
 
 function Avatar({ initials, size = 26 }) {
-  const color = teamColors[initials] || '#6e6e73'
+  const color = colorForInitials(initials)
   return (
     <div style={{ width: size, height: size, minWidth: size, borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.38, fontWeight: 700, color: '#fff' }}>
       {initials}
@@ -39,7 +33,7 @@ function Avatar({ initials, size = 26 }) {
   )
 }
 
-function JobModal({ onClose }) {
+function JobModal({ onClose, team }) {
   const [form, setForm] = useState({ name: '', client: '', address: '', scope: '', assigned: [], priority: 'Normal', start: '', notes: '' })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const toggleAssign = (initials) => {
@@ -57,16 +51,16 @@ function JobModal({ onClose }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
               <div style={lbl}>Job name</div>
-              <input style={inp} placeholder="e.g. Lakeside Residence" value={form.name} onChange={e => set('name', e.target.value)} />
+              <input style={inp} placeholder="Job name" value={form.name} onChange={e => set('name', e.target.value)} />
             </div>
             <div>
               <div style={lbl}>Client</div>
-              <input style={inp} placeholder="e.g. Johnson Family" value={form.client} onChange={e => set('client', e.target.value)} />
+              <input style={inp} placeholder="Client name" value={form.client} onChange={e => set('client', e.target.value)} />
             </div>
           </div>
           <div style={{ marginBottom: 12 }}>
             <div style={lbl}>Site address</div>
-            <input style={inp} placeholder="e.g. 12 Lakeside Dr, Portland OR" value={form.address} onChange={e => set('address', e.target.value)} />
+            <input style={inp} placeholder="Street address" value={form.address} onChange={e => set('address', e.target.value)} />
           </div>
           <div style={{ marginBottom: 12 }}>
             <div style={lbl}>Scope of work</div>
@@ -88,13 +82,20 @@ function JobModal({ onClose }) {
           </div>
           <div style={{ marginBottom: 12 }}>
             <div style={lbl}>Assign team</div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-              {Object.entries(teamColors).map(([initials]) => (
-                <div key={initials} onClick={() => toggleAssign(initials)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 7, border: `1px solid ${form.assigned.includes(initials) ? teamColors[initials] : 'var(--border)'}`, background: form.assigned.includes(initials) ? `${teamColors[initials]}18` : 'transparent', cursor: 'pointer' }}>
-                  <Avatar initials={initials} size={20} />
-                  <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text)' }}>{initials}</span>
-                </div>
-              ))}
+            <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+              {team.length === 0 && (
+                <span style={{ fontSize: 11, color: 'var(--text3)' }}>No team members yet — invite some from the Team page.</span>
+              )}
+              {team.map(m => {
+                const color = colorForInitials(m.initials)
+                const selected = form.assigned.includes(m.initials)
+                return (
+                  <div key={m.id} onClick={() => toggleAssign(m.initials)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 7, border: `1px solid ${selected ? color : 'var(--border)'}`, background: selected ? `${color}18` : 'transparent', cursor: 'pointer' }}>
+                    <Avatar initials={m.initials} size={20} />
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text)' }}>{m.initials}</span>
+                  </div>
+                )
+              })}
             </div>
           </div>
           <div>
@@ -119,22 +120,40 @@ const portalBtn = { padding: '7px 12px', borderRadius: 7, fontSize: 11, fontWeig
 
 export default function JobsProposals() {
   const [jobs, setJobs] = useState([])
+  const [proposals, setProposals] = useState([])
+  const [team, setTeam] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('proposals')
   const [showJob, setShowJob] = useState(false)
   const [selected, setSelected] = useState(null)
 
   useEffect(() => {
-    apiGet('/api/jobs')
-      .then(rows => setJobs(rows.map(j => ({
+    Promise.all([
+      apiGet('/api/jobs').catch(() => []),
+      apiGet('/api/proposals').catch(() => []),
+      apiGet('/api/team').catch(() => []),
+    ]).then(([jobRows, propRows, teamRows]) => {
+      setJobs(jobRows.map(j => ({
         ...j,
         assigned: j.assigned || [],
         start: j.start || j.start_date || '',
         client: j.client_name || '',
-      }))))
-      .catch(err => console.error('Failed to load jobs', err))
-      .finally(() => setLoading(false))
+      })))
+      setProposals(propRows.map(p => ({
+        ...p,
+        client: p.client_name || '',
+        portalId: p.portal_id || '',
+        labor: Number(p.labor) || 0,
+        materials: Number(p.materials) || 0,
+        total: Number(p.total) || 0,
+        assigned: p.assigned || '',
+        created: p.created_at ? new Date(p.created_at).toLocaleDateString() : '',
+      })))
+      setTeam(teamRows)
+    }).finally(() => setLoading(false))
   }, [])
+
+  const PROPOSALS = proposals
 
   if (loading) {
     return (
@@ -149,7 +168,7 @@ export default function JobsProposals() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-      {showJob && <JobModal onClose={() => setShowJob(false)} />}
+      {showJob && <JobModal onClose={() => setShowJob(false)} team={team} />}
 
       {/* TOPBAR */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
@@ -224,6 +243,13 @@ export default function JobsProposals() {
                 )
               })}
             </div>
+            {jobs.length === 0 && (
+              <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>No jobs yet</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 14 }}>Create your first job to start tracking work.</div>
+                <button onClick={() => setShowJob(true)} style={{ ...primaryBtn, fontSize: 12 }}>+ New job</button>
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {jobs.map(job => (
                 <div key={job.id} onClick={() => setSelected(selected?.id === job.id ? null : job)} style={{ background: 'var(--bg2)', border: `1px solid ${selected?.id === job.id ? 'var(--accent)' : 'var(--border2)'}`, borderRadius: 11, padding: '14px 16px', cursor: 'pointer', transition: 'all 0.12s' }}>
@@ -292,6 +318,13 @@ export default function JobsProposals() {
             </div>
 
             {/* PROPOSAL LIST */}
+            {PROPOSALS.length === 0 && (
+              <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>No proposals yet</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 14 }}>Proposals will appear here once they sync from Portal.io.</div>
+                <a href="https://portal.io" target="_blank" rel="noreferrer" style={{ ...primaryBtn, fontSize: 12, display: 'inline-block', textDecoration: 'none' }}>Open Portal.io</a>
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {PROPOSALS.map(p => (
                 <div key={p.id} onClick={() => setSelected(selected?.id === p.id ? null : p)} style={{ background: 'var(--bg2)', border: `1px solid ${selected?.id === p.id ? 'var(--accent)' : 'var(--border2)'}`, borderRadius: 11, padding: '14px 16px', cursor: 'pointer', transition: 'all 0.12s' }}>

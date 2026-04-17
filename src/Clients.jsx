@@ -41,7 +41,7 @@ function NewClientModal({ onClose }) {
         <div style={{ padding: '18px 22px' }}>
           <div style={{ marginBottom: 12 }}>
             <div style={lbl}>Full name</div>
-            <input style={inp} placeholder="e.g. Johnson Family" value={form.name} onChange={e => set('name', e.target.value)} />
+            <input style={inp} placeholder="Client name" value={form.name} onChange={e => set('name', e.target.value)} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -55,7 +55,7 @@ function NewClientModal({ onClose }) {
           </div>
           <div style={{ marginBottom: 12 }}>
             <div style={lbl}>Address</div>
-            <input style={inp} placeholder="e.g. 12 Lakeside Dr, Portland OR 97201" value={form.address} onChange={e => set('address', e.target.value)} />
+            <input style={inp} placeholder="Street address" value={form.address} onChange={e => set('address', e.target.value)} />
           </div>
           <div>
             <div style={lbl}>Notes</div>
@@ -242,6 +242,13 @@ export default function Clients() {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
         <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 500, marginBottom: 12 }}>{filtered.length} client{filtered.length !== 1 ? 's' : ''}</div>
+        {filtered.length === 0 && clients.length === 0 && (
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>No clients added</div>
+            <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 14 }}>Add your first client to start tracking jobs, proposals, and tickets.</div>
+            <button onClick={() => setShowNew(true)} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#1d1d1f', color: '#fff', fontFamily: 'var(--font)' }}>+ New client</button>
+          </div>
+        )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map(client => {
             const initials = client.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { apiGet } from './lib/api'
-
-const teamColors = { JD: '#0066cc', MR: '#34c759', SW: '#534AB7', AL: '#ff9500' }
+import { colorForInitials } from './lib/color'
 
 const typeColors = {
   Device: { bg: 'rgba(255,59,48,0.08)', color: '#d70015' },
@@ -32,11 +31,11 @@ function Badge({ text, colors }) {
 }
 
 function Avatar({ initials, size = 24 }) {
-  return <div style={{ width: size, height: size, minWidth: size, borderRadius: '50%', background: teamColors[initials] || '#6e6e73', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.38, fontWeight: 700, color: '#fff' }}>{initials}</div>
+  return <div style={{ width: size, height: size, minWidth: size, borderRadius: '50%', background: colorForInitials(initials), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.38, fontWeight: 700, color: '#fff' }}>{initials}</div>
 }
 
-function NewTicketModal({ onClose }) {
-  const [form, setForm] = useState({ client: '', contact: '', phone: '', issue: '', type: 'Device', priority: 'Normal', assigned: 'JD', notes: '' })
+function NewTicketModal({ onClose, team }) {
+  const [form, setForm] = useState({ client: '', contact: '', phone: '', issue: '', type: 'Device', priority: 'Normal', assigned: team[0]?.initials || '', notes: '' })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
@@ -47,7 +46,7 @@ function NewTicketModal({ onClose }) {
         </div>
         <div style={{ padding: '18px 22px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div><div style={lbl}>Client</div><input style={inp} placeholder="e.g. Johnson Family" value={form.client} onChange={e => set('client', e.target.value)} /></div>
+            <div><div style={lbl}>Client</div><input style={inp} placeholder="Client name" value={form.client} onChange={e => set('client', e.target.value)} /></div>
             <div><div style={lbl}>Contact name</div><input style={inp} placeholder="e.g. Sarah Johnson" value={form.contact} onChange={e => set('contact', e.target.value)} /></div>
           </div>
           <div style={{ marginBottom: 12 }}>
@@ -78,10 +77,8 @@ function NewTicketModal({ onClose }) {
             <div>
               <div style={lbl}>Assign to</div>
               <select style={inp} value={form.assigned} onChange={e => set('assigned', e.target.value)}>
-                <option value="JD">John D.</option>
-                <option value="MR">Mike R.</option>
-                <option value="SW">Sam W.</option>
-                <option value="AL">Amy L.</option>
+                {team.length === 0 && <option value="">No team members</option>}
+                {team.map(m => <option key={m.id} value={m.initials}>{m.name}</option>)}
               </select>
             </div>
           </div>
@@ -151,7 +148,7 @@ function TicketDetail({ ticket, onClose }) {
               {ticket.history.map((h, i) => (
                 <div key={i} style={{ display: 'flex', gap: 12, paddingBottom: 12 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: h.by === 'System' ? 'var(--text3)' : teamColors[h.by] || 'var(--accent)', marginTop: 4, flexShrink: 0 }} />
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: h.by === 'System' ? 'var(--text3)' : colorForInitials(h.by), marginTop: 4, flexShrink: 0 }} />
                     {i < ticket.history.length - 1 && <div style={{ width: 1, flex: 1, background: 'var(--border2)', marginTop: 4 }} />}
                   </div>
                   <div style={{ flex: 1, paddingBottom: 4 }}>
@@ -194,11 +191,21 @@ export default function SupportTickets() {
   const [showNew, setShowNew] = useState(false)
   const [selected, setSelected] = useState(null)
 
+  const [team, setTeam] = useState([])
+
   useEffect(() => {
-    apiGet('/api/tickets')
-      .then(rows => setTickets(rows.map(r => ({ ...r, history: r.history || [] }))))
-      .catch(err => console.error('Failed to load tickets', err))
-      .finally(() => setLoading(false))
+    Promise.all([
+      apiGet('/api/tickets').catch(() => []),
+      apiGet('/api/team').catch(() => []),
+    ]).then(([tkts, tm]) => {
+      setTickets(tkts.map(r => ({
+        ...r,
+        client: r.client_name || '',
+        history: r.history || [],
+        created: r.created_at ? new Date(r.created_at).toLocaleString() : '',
+      })))
+      setTeam(tm)
+    }).finally(() => setLoading(false))
   }, [])
 
   if (loading) {
@@ -227,7 +234,7 @@ export default function SupportTickets() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-      {showNew && <NewTicketModal onClose={() => setShowNew(false)} />}
+      {showNew && <NewTicketModal onClose={() => setShowNew(false)} team={team} />}
       {selected && <TicketDetail ticket={selected} onClose={() => setSelected(null)} />}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
@@ -261,6 +268,13 @@ export default function SupportTickets() {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
         <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 500, marginBottom: 12 }}>{filtered.length} ticket{filtered.length !== 1 ? 's' : ''}</div>
+        {filtered.length === 0 && tickets.length === 0 && (
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>No tickets yet</div>
+            <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 14 }}>Create a ticket when a client reports an issue.</div>
+            <button onClick={() => setShowNew(true)} style={{ ...primaryBtn, fontSize: 12 }}>+ New ticket</button>
+          </div>
+        )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map(ticket => (
             <div key={ticket.id} onClick={() => setSelected(ticket)} style={{ background: 'var(--bg2)', border: `1px solid ${ticket.priority === 'Urgent' && ticket.status !== 'Resolved' ? 'rgba(255,59,48,0.3)' : 'var(--border2)'}`, borderRadius: 11, padding: '13px 16px', cursor: 'pointer', transition: 'all 0.12s' }}>
