@@ -147,7 +147,7 @@ function PlanModal({ client, plan, onClose, onSave }) {
   )
 }
 
-function ServicePlansTab({ clients, plans, setPlans }) {
+function ServicePlansTab({ clients, plans, onSavePlan }) {
   const [selected, setSelected] = useState(null)
 
   const mrr = clients.reduce((sum, c) => sum + tierByName(plans[c.id]?.tier).price, 0)
@@ -234,16 +234,14 @@ function ServicePlansTab({ clients, plans, setPlans }) {
           client={selected}
           plan={plans[selected.id]}
           onClose={() => setSelected(null)}
-          onSave={p => setPlans(prev => ({ ...prev, [selected.id]: p }))}
+          onSave={p => onSavePlan(selected.id, p)}
         />
       )}
     </div>
   )
 }
 
-function CheckInsTab({ clients, jobs }) {
-  const [sent, setSent] = useState({})
-
+function CheckInsTab({ clients, jobs, sent, onSend }) {
   // latest Complete job per client
   const lastJobByClient = {}
   for (const j of jobs) {
@@ -253,8 +251,6 @@ function CheckInsTab({ clients, jobs }) {
       lastJobByClient[j.client_id] = j
     }
   }
-
-  const markSent = (clientId, days) => setSent(prev => ({ ...prev, [`${clientId}_${days}`]: true }))
 
   const statusFor = (clientId, scheduled, days) => {
     if (sent[`${clientId}_${days}`]) return 'Sent'
@@ -323,7 +319,7 @@ function CheckInsTab({ clients, jobs }) {
                     </div>
                     {status !== 'Sent' && (
                       <button
-                        onClick={() => markSent(c.id, iv.days)}
+                        onClick={() => onSend(c.id, iv.days, scheduled)}
                         style={{ alignSelf: 'flex-start', padding: '3px 9px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}
                       >
                         Send now
@@ -346,16 +342,87 @@ export default function Outreach() {
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [plans, setPlans] = useState({})
+  const [sent, setSent] = useState({})
 
   useEffect(() => {
     Promise.all([
       apiGet('/api/clients').catch(() => []),
       apiGet('/api/jobs').catch(() => []),
-    ]).then(([c, j]) => {
+      apiGet('/api/check-ins').catch(() => []),
+    ]).then(([c, j, ci]) => {
       setClients(c)
       setJobs(j)
+
+      const planMap = {}
+      for (const client of c) {
+        if (client.plan_tier && client.plan_tier !== 'None') {
+          planMap[client.id] = {
+            tier: client.plan_tier,
+            startDate: client.plan_start_date ? String(client.plan_start_date).slice(0, 10) : null,
+            renewalDate: client.plan_renewal_date ? String(client.plan_renewal_date).slice(0, 10) : null,
+          }
+        }
+      }
+      setPlans(planMap)
+
+      const sentMap = {}
+      for (const row of ci) {
+        if (row.sent_at) sentMap[`${row.client_id}_${row.interval_days}`] = true
+      }
+      setSent(sentMap)
     }).finally(() => setLoading(false))
   }, [])
+
+  const savePlan = async (clientId, planData) => {
+    const base = import.meta.env.VITE_API_URL || ''
+    try {
+      const res = await fetch(`${base}/api/clients/${clientId}/plan`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan_tier: planData.tier,
+          plan_start_date: planData.startDate,
+          plan_renewal_date: planData.renewalDate,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `${res.status}`)
+      }
+      setPlans(prev => {
+        const next = { ...prev }
+        if (planData.tier === 'None') delete next[clientId]
+        else next[clientId] = planData
+        return next
+      })
+    } catch (err) {
+      console.error('Failed to save plan', err)
+      alert('Failed to save plan: ' + err.message)
+    }
+  }
+
+  const sendCheckIn = async (clientId, intervalDays, scheduledFor) => {
+    const base = import.meta.env.VITE_API_URL || ''
+    try {
+      const res = await fetch(`${base}/api/check-ins`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: clientId,
+          interval_days: intervalDays,
+          scheduled_for: scheduledFor,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `${res.status}`)
+      }
+      setSent(prev => ({ ...prev, [`${clientId}_${intervalDays}`]: true }))
+    } catch (err) {
+      console.error('Failed to record check-in', err)
+      alert('Failed to record check-in: ' + err.message)
+    }
+  }
 
   const tabs = [
     { key: 'plans', label: 'Service plans' },
@@ -404,8 +471,8 @@ export default function Outreach() {
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {tab === 'plans' && <ServicePlansTab clients={clients} plans={plans} setPlans={setPlans} />}
-        {tab === 'checkins' && <CheckInsTab clients={clients} jobs={jobs} />}
+        {tab === 'plans' && <ServicePlansTab clients={clients} plans={plans} onSavePlan={savePlan} />}
+        {tab === 'checkins' && <CheckInsTab clients={clients} jobs={jobs} sent={sent} onSend={sendCheckIn} />}
       </div>
     </div>
   )

@@ -27,7 +27,25 @@ CREATE TABLE IF NOT EXISTS clients (
   status TEXT DEFAULT 'Active',
   notes TEXT,
   tags TEXT[] DEFAULT '{}',
+  plan_tier TEXT DEFAULT 'None',
+  plan_start_date DATE,
+  plan_renewal_date DATE,
   created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Backfill for DBs created before the plan columns existed.
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_tier TEXT DEFAULT 'None';
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_start_date DATE;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_renewal_date DATE;
+
+CREATE TABLE IF NOT EXISTS check_ins (
+  id SERIAL PRIMARY KEY,
+  client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+  interval_days INTEGER NOT NULL,
+  scheduled_for DATE,
+  sent_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (client_id, interval_days)
 );
 
 CREATE TABLE IF NOT EXISTS jobs (
