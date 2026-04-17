@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- rounded-square background -->
+  <rect width="512" height="512" rx="96" fill="#0a0c10"/>
+
+  <!-- centered "ix" monogram, geometric so it renders without any font -->
+  <g transform="translate(256 256)">
+    <!-- "i" dot -->
+    <circle cx="-80" cy="-110" r="26" fill="#e8eaf0"/>
+    <!-- "i" stem -->
+    <rect x="-106" y="-70" width="52" height="190" rx="10" fill="#e8eaf0"/>
+
+    <!-- "x" as two crossed bars -->
+    <g fill="#0066cc">
+      <rect x="-100" y="-22" width="200" height="44" rx="10" transform="translate(58 14) rotate(35)"/>
+      <rect x="-100" y="-22" width="200" height="44" rx="10" transform="translate(58 14) rotate(-35)"/>
+    </g>
+  </g>
+</svg>
