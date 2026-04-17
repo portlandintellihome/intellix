@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Briefcase, Users, HeadphonesIcon,
   CalendarDays, Wrench, Library, Package,
-  Bot, Users2, BarChart2, Plug, Settings
+  Bot, Users2, BarChart2, Plug, Settings, LogOut
 } from 'lucide-react'
 import Dashboard from './Dashboard'
 import './index.css'
@@ -19,6 +19,9 @@ import Team from './Team'
 import Reporting from './Reporting'
 import Integrations from './Integrations'
 import SettingsPage from './Settings'
+import Login from './Login'
+
+const TOKEN_KEY = 'intellix_token'
 
 
 
@@ -59,8 +62,49 @@ function Placeholder({ title }) {
   )
 }
 
+function initialsOf(name) {
+  if (!name) return '?'
+  return name.trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
+}
+
 export default function App() {
   const [dark, setDark] = useState(false)
+  const [user, setUser] = useState(null)
+  const [authChecking, setAuthChecking] = useState(true)
+
+  useEffect(() => {
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (!token) { setAuthChecking(false); return }
+    const base = import.meta.env.VITE_API_URL || ''
+    fetch(`${base}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(async res => {
+        if (!res.ok) throw new Error('invalid')
+        setUser(await res.json())
+      })
+      .catch(() => localStorage.removeItem(TOKEN_KEY))
+      .finally(() => setAuthChecking(false))
+  }, [])
+
+  const logout = () => {
+    localStorage.removeItem(TOKEN_KEY)
+    setUser(null)
+  }
+
+  if (authChecking) {
+    return (
+      <div className={dark ? 'dark' : ''} style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', color: 'var(--text3)', fontSize: 13, fontFamily: 'var(--font)' }}>
+        Loading…
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className={dark ? 'dark' : ''}>
+        <Login onLogin={setUser} />
+      </div>
+    )
+  }
 
   return (
     <div className={dark ? 'dark' : ''} style={{ height: '100vh', display: 'flex', background: 'var(--bg)' }}>
@@ -151,31 +195,44 @@ export default function App() {
 
             <div style={{
               padding: 12, borderTop: '1px solid var(--border2)',
-              display: 'flex', alignItems: 'center', gap: 8
+              display: 'flex', alignItems: 'center', gap: 6
             }}>
               <div style={{
                 width: 28, height: 28, borderRadius: '50%',
                 background: 'var(--accent)', display: 'flex',
                 alignItems: 'center', justifyContent: 'center',
                 fontSize: 10, fontWeight: 700, color: '#fff'
-              }}>AC</div>
+              }}>{initialsOf(user.name)}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Acme AV</div>
-                <div style={{ fontSize: 9.5, color: 'var(--text3)' }}>Admin</div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.name}</div>
+                <div style={{ fontSize: 9.5, color: 'var(--text3)' }}>{user.role}</div>
               </div>
               <button
                 onClick={() => setDark(!dark)}
+                title={dark ? 'Light mode' : 'Dark mode'}
                 style={{
-                  width: 28, height: 28, borderRadius: 7,
+                  width: 26, height: 26, borderRadius: 7,
                   background: 'var(--bg3)', border: '1px solid var(--border2)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', color: 'var(--text2)'
+                  cursor: 'pointer', color: 'var(--text2)', flexShrink: 0
                 }}
               >
                 {dark
-                  ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                  : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+                  ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                  : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
                 }
+              </button>
+              <button
+                onClick={logout}
+                title="Sign out"
+                style={{
+                  width: 26, height: 26, borderRadius: 7,
+                  background: 'var(--bg3)', border: '1px solid var(--border2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: 'var(--text2)', flexShrink: 0
+                }}
+              >
+                <LogOut size={12} strokeWidth={2} />
               </button>
             </div>
           </div>

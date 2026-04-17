@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import express from 'express'
 import cors from 'cors'
 
+import authRouter from './routes/auth.js'
 import jobsRouter from './routes/jobs.js'
 import clientsRouter from './routes/clients.js'
 import ticketsRouter from './routes/tickets.js'
@@ -24,6 +25,7 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' })
 })
 
+app.use('/api/auth', authRouter)
 app.use('/api/jobs', jobsRouter)
 app.use('/api/clients', clientsRouter)
 app.use('/api/tickets', ticketsRouter)
