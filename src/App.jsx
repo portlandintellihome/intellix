@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Briefcase, Users, HeadphonesIcon,
   CalendarDays, Wrench, Library, Package,
-  Bot, Users2, BarChart2, Plug, Settings, LogOut
+  Bot, Users2, BarChart2, Plug, Settings, LogOut, Mail
 } from 'lucide-react'
 import Dashboard from './Dashboard'
 import './index.css'
@@ -19,6 +19,7 @@ import Team from './Team'
 import Reporting from './Reporting'
 import Integrations from './Integrations'
 import SettingsPage from './Settings'
+import Outreach from './Outreach'
 import Login from './Login'
 import ChangePassword from './ChangePassword'
 
@@ -34,6 +35,7 @@ const NAV = [
   { path: '/clients', label: 'Clients', icon: Users },
   { path: '/tickets', label: 'Support tickets', icon: HeadphonesIcon },
   { path: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { path: '/outreach', label: 'Outreach', icon: Mail },
   { section: 'Workspace' },
   { path: '/composer', label: 'Composer builds', icon: Wrench },
   { path: '/drivers', label: 'Driver library', icon: Library },
@@ -254,6 +256,7 @@ export default function App() {
               <Route path="/clients" element={<Clients />} />
               <Route path="/tickets" element={<SupportTickets />} />
               <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/outreach" element={<Outreach />} />
               <Route path="/composer" element={<ComposerBuilds />} />
               <Route path="/drivers" element={<DriverLibrary />} />
               <Route path="/inventory" element={<Inventory />} />
