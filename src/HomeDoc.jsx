@@ -19,13 +19,13 @@ const mono = { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }
 const primaryBtn = { padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#1d1d1f', color: '#fff', fontFamily: 'var(--font)' }
 const ghostBtn = { padding: '7px 14px', borderRadius: 7, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontFamily: 'var(--font)' }
 
-function emptyIntellifile() {
+function emptyHomeDoc() {
   return FIELDS.reduce((acc, f) => ({ ...acc, [f.key]: '' }), {})
 }
 
-function patchIntellifile(clientId, body) {
+function patchHomeDoc(clientId, body) {
   const base = import.meta.env.VITE_API_URL || ''
-  return fetch(`${base}/api/clients/${clientId}/intellifile`, {
+  return fetch(`${base}/api/clients/${clientId}/homedoc`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -62,7 +62,7 @@ function FieldCard({ field, value, editing, onChange }) {
 
 function ClientRow({ client, onOpen }) {
   const initials = initialsOf(client.name)
-  const filledCount = Object.values(client.intellifile || {}).filter(v => v && String(v).trim()).length
+  const filledCount = Object.values(client.homedoc || {}).filter(v => v && String(v).trim()).length
   return (
     <div
       onClick={onOpen}
@@ -100,7 +100,7 @@ function ClientList({ clients, onOpen }) {
       <div style={{ padding: '16px 24px 24px' }}>
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>No clients yet</div>
-          <div style={{ fontSize: 11.5, color: 'var(--text3)' }}>Add a client first, then build out their IntelliFile record.</div>
+          <div style={{ fontSize: 11.5, color: 'var(--text3)' }}>Add a client first, then build out their HomeDoc record.</div>
         </div>
       </div>
     )
@@ -116,8 +116,8 @@ function ClientList({ clients, onOpen }) {
   )
 }
 
-function IntelliFileDetail({ client, onBack, onSave }) {
-  const initial = { ...emptyIntellifile(), ...(client.intellifile || {}) }
+function HomeDocDetail({ client, onBack, onSave }) {
+  const initial = { ...emptyHomeDoc(), ...(client.homedoc || {}) }
   const [data, setData] = useState(initial)
   const [notes, setNotes] = useState(client.notes || '')
   const [editing, setEditing] = useState(false)
@@ -126,14 +126,14 @@ function IntelliFileDetail({ client, onBack, onSave }) {
   const [error, setError] = useState('')
 
   const startEdit = () => {
-    setData({ ...emptyIntellifile(), ...(client.intellifile || {}) })
+    setData({ ...emptyHomeDoc(), ...(client.homedoc || {}) })
     setNotes(client.notes || '')
     setError('')
     setEditing(true)
   }
 
   const cancelEdit = () => {
-    setData({ ...emptyIntellifile(), ...(client.intellifile || {}) })
+    setData({ ...emptyHomeDoc(), ...(client.homedoc || {}) })
     setNotes(client.notes || '')
     setError('')
     setEditing(false)
@@ -143,7 +143,7 @@ function IntelliFileDetail({ client, onBack, onSave }) {
     setSaving(true)
     setError('')
     try {
-      const res = await patchIntellifile(client.id, { intellifile: data, notes })
+      const res = await patchHomeDoc(client.id, { homedoc: data, notes })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
         throw new Error(d.error || `${res.status}`)
@@ -159,7 +159,7 @@ function IntelliFileDetail({ client, onBack, onSave }) {
   }
 
   const share = async () => {
-    const url = `${window.location.origin}/intellifile/${client.id}`
+    const url = `${window.location.origin}/homedoc/${client.id}`
     try {
       await navigator.clipboard.writeText(url)
       setCopied(true)
@@ -240,7 +240,7 @@ function IntelliFileDetail({ client, onBack, onSave }) {
   )
 }
 
-export default function IntelliFile() {
+export default function HomeDoc() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [clients, setClients] = useState([])
@@ -255,8 +255,8 @@ export default function IntelliFile() {
 
   const selected = id ? clients.find(c => String(c.id) === String(id)) : null
 
-  const openClient = (c) => navigate(`/intellifile/${c.id}`)
-  const closeClient = () => navigate('/intellifile')
+  const openClient = (c) => navigate(`/homedoc/${c.id}`)
+  const closeClient = () => navigate('/homedoc')
 
   const handleSave = (updatedClient) => {
     setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c))
@@ -266,7 +266,7 @@ export default function IntelliFile() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>IntelliFile</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>HomeDoc</div>
         </div>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13, fontWeight: 500 }}>Loading…</div>
       </div>
@@ -277,7 +277,7 @@ export default function IntelliFile() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>IntelliFile</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>HomeDoc</div>
           <button onClick={closeClient} style={{ ...ghostBtn, fontSize: 11 }}>← All records</button>
         </div>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13, fontWeight: 500 }}>No client found for that link.</div>
@@ -286,13 +286,13 @@ export default function IntelliFile() {
   }
 
   if (selected) {
-    return <IntelliFileDetail client={selected} onBack={closeClient} onSave={handleSave} />
+    return <HomeDocDetail client={selected} onBack={closeClient} onSave={handleSave} />
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>IntelliFile</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>HomeDoc</div>
       </div>
       <div style={{ flex: 1, overflowY: 'auto' }}>
         <ClientList clients={clients} onOpen={openClient} />

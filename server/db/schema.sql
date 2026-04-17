@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS clients (
   plan_tier TEXT DEFAULT 'None',
   plan_start_date DATE,
   plan_renewal_date DATE,
-  intellifile JSONB DEFAULT '{}',
+  homedoc JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -38,7 +38,18 @@ CREATE TABLE IF NOT EXISTS clients (
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_tier TEXT DEFAULT 'None';
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_start_date DATE;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_renewal_date DATE;
-ALTER TABLE clients ADD COLUMN IF NOT EXISTS intellifile JSONB DEFAULT '{}';
+
+-- Rename intellifile -> homedoc if the old column exists (and the new
+-- one doesn't yet). Idempotent: safe to re-run.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clients' AND column_name = 'intellifile')
+     AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clients' AND column_name = 'homedoc') THEN
+    ALTER TABLE clients RENAME COLUMN intellifile TO homedoc;
+  END IF;
+END $$;
+
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS homedoc JSONB DEFAULT '{}';
 
 CREATE TABLE IF NOT EXISTS check_ins (
   id SERIAL PRIMARY KEY,

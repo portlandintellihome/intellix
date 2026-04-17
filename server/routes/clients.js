@@ -18,19 +18,19 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-router.patch('/:id/intellifile', async (req, res, next) => {
+router.patch('/:id/homedoc', async (req, res, next) => {
   try {
-    const { intellifile, notes } = req.body || {}
-    if (!intellifile || typeof intellifile !== 'object') {
-      return res.status(400).json({ error: 'intellifile object is required' })
+    const { homedoc, notes } = req.body || {}
+    if (!homedoc || typeof homedoc !== 'object') {
+      return res.status(400).json({ error: 'homedoc object is required' })
     }
     const { rows } = await query(
       `UPDATE clients
-       SET intellifile = $1,
+       SET homedoc = $1,
            notes = COALESCE($2, notes)
        WHERE id = $3
        RETURNING *`,
-      [intellifile, typeof notes === 'string' ? notes : null, req.params.id]
+      [homedoc, typeof notes === 'string' ? notes : null, req.params.id]
     )
     if (rows.length === 0) return res.status(404).json({ error: 'Not found' })
     res.json(rows[0])
