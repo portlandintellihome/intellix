@@ -9,9 +9,8 @@ function Message({ msg }) {
       <div style={{ width: 28, height: 28, minWidth: 28, borderRadius: '50%', background: isUser ? '#1d1d1f' : 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
         {isUser ? 'You' : 'AI'}
       </div>
-      <div style={{ maxWidth: '75%', background: isUser ? '#1d1d1f' : 'var(--bg2)', border: isUser ? 'none' : '1px solid var(--border2)', borderRadius: isUser ? '12px 4px 12px 12px' : '4px 12px 12px 12px', padding: '10px 14px', fontSize: 13, color: isUser ? '#fff' : 'var(--text)', lineHeight: 1.6, fontFamily: 'var(--font)' }}>
+      <div style={{ maxWidth: '75%', background: isUser ? '#1d1d1f' : 'var(--bg2)', border: isUser ? 'none' : '1px solid var(--border2)', borderRadius: isUser ? '12px 4px 12px 12px' : '4px 12px 12px 12px', padding: '10px 14px', fontSize: 13, color: isUser ? '#fff' : 'var(--text)', lineHeight: 1.6, fontFamily: 'var(--font)', wordBreak: 'break-word' }}>
         {msg.content}
-        {msg.typing && <span style={{ display: 'inline-block', animation: 'pulse 1s infinite' }}>▋</span>}
       </div>
     </div>
   )
@@ -27,7 +26,7 @@ export default function IntelixAssist() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, loading])
 
   useEffect(() => {
     const base = import.meta.env.VITE_API_URL || ''
@@ -62,7 +61,6 @@ export default function IntelixAssist() {
       setMessages(m => [...m, { role: 'assistant', content: `⚠️ ${err.message}`, error: true }])
     } finally {
       setLoading(false)
-      inputRef.current?.focus()
     }
   }
 
@@ -77,35 +75,40 @@ export default function IntelixAssist() {
     setMessages([{ role: 'assistant', content: GREETING }])
   }
 
+  // Chat layout — iMessage-style:
+  //  • Outer: flex column, 100% height, background from theme.
+  //  • Header: natural size at the top.
+  //  • Messages: flex:1 with overflow-y:auto, min-height:0 so it can shrink
+  //    when the keyboard collapses the viewport.
+  //  • Input: flex-shrink:0 at the bottom. iOS pushes the whole shell up
+  //    naturally when the keyboard opens (helped by interactive-widget=
+  //    resizes-content on the viewport meta).
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, background: 'var(--bg)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg)' }}>
 
-      {/* TOPBAR */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      {/* Header */}
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Intellix Assist</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 6, background: apiConnected ? 'rgba(52,199,89,0.09)' : 'rgba(255,149,0,0.09)', border: '1px solid ' + (apiConnected ? 'rgba(52,199,89,0.2)' : 'rgba(255,149,0,0.2)') }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: apiConnected ? '#34c759' : '#ff9500' }} />
             <span style={{ fontSize: 10.5, fontWeight: 600, color: apiConnected ? '#248a3d' : '#c93400' }}>{apiConnected ? 'Connected' : 'API key needed'}</span>
           </div>
         </div>
-        <button onClick={clearChat} style={{ padding: '6px 12px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>Clear chat</button>
+        <button onClick={clearChat} style={{ padding: '6px 12px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>Clear</button>
       </div>
 
-      {/* API WARNING */}
       {apiConnected === false && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 24px', background: 'rgba(255,149,0,0.06)', borderBottom: '1px solid rgba(255,149,0,0.15)', flexShrink: 0 }}>
+        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: 'rgba(255,149,0,0.06)', borderBottom: '1px solid rgba(255,149,0,0.15)' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c93400" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span style={{ fontSize: 11.5, color: '#c93400', fontWeight: 500, flex: 1 }}>ANTHROPIC_API_KEY is not set on the backend — Intellix Assist will return an error until it's configured.</span>
+          <span style={{ fontSize: 11.5, color: '#c93400', fontWeight: 500, flex: 1 }}>ANTHROPIC_API_KEY is not set on the backend.</span>
         </div>
       )}
 
-      {/* MESSAGES — fills the space between topbar and input, scrolls on overflow. */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', background: 'var(--bg)' }}>
-        <div style={{ maxWidth: 760, margin: '0 auto', padding: '20px 24px' }}>
-
+      {/* Messages */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--bg)' }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', padding: '16px' }}>
           {messages.map((msg, i) => <Message key={i} msg={msg} />)}
-
           {loading && (
             <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'flex-start' }}>
               <div style={{ width: 28, height: 28, minWidth: 28, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff' }}>AI</div>
@@ -120,28 +123,26 @@ export default function IntelixAssist() {
         </div>
       </div>
 
-      {/* INPUT — sibling to messages, pinned at the bottom via flex-shrink: 0. */}
-      <div style={{ flexShrink: 0, background: 'var(--bg2)', borderTop: '1px solid var(--border2)', padding: '14px 24px' }}>
-        <div style={{ maxWidth: 760, margin: '0 auto' }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: '8px 8px 8px 14px' }}>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKey}
-              placeholder="Ask anything about Control4, Composer Pro, jobs, proposals..."
-              rows={1}
-              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', resize: 'none', fontSize: 13, color: 'var(--text)', fontFamily: 'var(--font)', lineHeight: 1.5, maxHeight: 120, overflowY: 'auto' }}
-            />
-            <button
-              onClick={() => send()}
-              disabled={!input.trim() || loading}
-              style={{ width: 34, height: 34, borderRadius: 8, border: 'none', background: input.trim() && !loading ? '#1d1d1f' : 'var(--bg4)', color: input.trim() && !loading ? '#fff' : 'var(--text3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: input.trim() && !loading ? 'pointer' : 'not-allowed', flexShrink: 0, transition: 'all 0.15s' }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            </button>
-          </div>
-          <div style={{ fontSize: 10.5, color: 'var(--text3)', textAlign: 'center', marginTop: 8 }}>Press Enter to send · Shift + Enter for new line</div>
+      {/* Input */}
+      <div style={{ flexShrink: 0, background: 'var(--bg2)', borderTop: '1px solid var(--border2)', padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', gap: 8, alignItems: 'flex-end', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 20, padding: '6px 6px 6px 14px' }}>
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Message"
+            rows={1}
+            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', resize: 'none', fontSize: 16, color: 'var(--text)', fontFamily: 'var(--font)', lineHeight: 1.4, maxHeight: 140, padding: '6px 0' }}
+          />
+          <button
+            onClick={() => send()}
+            disabled={!input.trim() || loading}
+            style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', background: input.trim() && !loading ? 'var(--accent)' : 'var(--bg4)', color: input.trim() && !loading ? '#fff' : 'var(--text3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: input.trim() && !loading ? 'pointer' : 'not-allowed', flexShrink: 0, transition: 'background 0.15s' }}
+            aria-label="Send"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </button>
         </div>
       </div>
 

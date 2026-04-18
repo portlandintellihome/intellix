@@ -89,30 +89,12 @@ function IntellixLogo({ dark, compact = false }) {
 function AppShell({ user, dark, setDark, logout }) {
   const isMobile = useIsMobile()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [inputFocused, setInputFocused] = useState(false)
   const location = useLocation()
 
-  // Hide the mobile bottom nav whenever an input/textarea is focused —
-  // otherwise iOS Safari can render it hovering between the content and the
-  // keyboard. Scoped to the mobile shell via `isMobile` below.
-  useEffect(() => {
-    const isEditable = el => {
-      if (!el) return false
-      const tag = el.tagName
-      return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable
-    }
-    const onFocusIn = e => { if (isEditable(e.target)) setInputFocused(true) }
-    const onFocusOut = () => {
-      // Defer so focus moving between two editables doesn't flash the nav.
-      setTimeout(() => setInputFocused(isEditable(document.activeElement)), 0)
-    }
-    window.addEventListener('focusin', onFocusIn)
-    window.addEventListener('focusout', onFocusOut)
-    return () => {
-      window.removeEventListener('focusin', onFocusIn)
-      window.removeEventListener('focusout', onFocusOut)
-    }
-  }, [])
+  // Assist on mobile takes over the full screen (like a native chat app):
+  // no bottom nav, no reserved padding. Keyboard rises naturally into the
+  // collapsed viewport instead of fighting with a fixed nav bar.
+  const assistFullScreen = isMobile && location.pathname === '/assist'
 
   // Close mobile sidebar whenever the route changes.
   useEffect(() => {
@@ -289,7 +271,7 @@ function AppShell({ user, dark, setDark, logout }) {
       {/* Main content */}
       <main style={{
         flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0,
-        paddingBottom: (isMobile && !inputFocused) ? 'calc(56px + env(safe-area-inset-bottom))' : 0,
+        paddingBottom: (isMobile && !assistFullScreen) ? 'calc(56px + env(safe-area-inset-bottom))' : 0,
       }}>
         <Suspense fallback={
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13, fontFamily: 'var(--font)' }}>Loading…</div>
@@ -315,10 +297,9 @@ function AppShell({ user, dark, setDark, logout }) {
         </Suspense>
       </main>
 
-      {/* Mobile bottom nav — hidden when any input/textarea is focused so the
-          keyboard can't push it to float between content and the keyboard on
-          iOS Safari. */}
-      {isMobile && !inputFocused && (
+      {/* Mobile bottom nav — hidden on /assist so the chat UI owns the full
+          screen (no bar floating between the input and the keyboard on iOS). */}
+      {isMobile && !assistFullScreen && (
         <nav style={{
           position: 'fixed',
           bottom: 0,
