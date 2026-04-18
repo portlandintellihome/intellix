@@ -33,6 +33,14 @@ router.get('/status', (_req, res) => {
 })
 
 router.post('/', async (req, res, next) => {
+  const start = Date.now()
+  const requestedMessages = Array.isArray(req.body?.messages) ? req.body.messages.length : null
+  console.log('[assist] request', {
+    messages: requestedMessages,
+    hasKey: Boolean(process.env.ANTHROPIC_API_KEY),
+    model: MODEL,
+  })
+
   try {
     const { messages } = req.body || {}
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -60,8 +68,28 @@ router.post('/', async (req, res, next) => {
       .map(b => b.text)
       .join('')
 
+    console.log('[assist] ok', {
+      ms: Date.now() - start,
+      stop_reason: response.stop_reason,
+      input_tokens: response.usage?.input_tokens,
+      output_tokens: response.usage?.output_tokens,
+    })
+
     res.json({ reply })
   } catch (err) {
+    // Log everything we can — Anthropic API errors expose status, type,
+    // request_id, and headers that pinpoint the cause.
+    console.error('[assist] error', {
+      name: err?.name,
+      message: err?.message,
+      status: err?.status,
+      code: err?.code,
+      type: err?.error?.type || err?.error?.error?.type,
+      request_id: err?.request_id || err?.headers?.['request-id'] || err?.headers?.['x-request-id'],
+      body: err?.error,
+      stack: err?.stack,
+    })
+
     if (err.code === 'missing_key') {
       return res.status(503).json({ error: 'Intellix Assist is not configured. Set ANTHROPIC_API_KEY on the backend.' })
     }
