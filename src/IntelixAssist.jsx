@@ -1,14 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 
-const SUGGESTED = [
-  { label: 'How do I bind a Lutron RadioRA 3 driver in Composer Pro?', cat: 'Control4' },
-  { label: 'What are the steps to connect to Director remotely?', cat: 'Control4' },
-  { label: 'How do I set up a Good Morning scene with lighting and thermostat?', cat: 'Control4' },
-  { label: 'What is the difference between EA-3 and EA-5?', cat: 'Control4' },
-  { label: 'Draft a follow-up email to a client after installation', cat: 'Business' },
-  { label: 'What should I include in a scope of work for a full AV job?', cat: 'Business' },
-]
-
 const GREETING = "Hi — I'm Intellix Assist. I can help with Control4 programming, Composer Pro, proposals, client communication, and anything else your team needs. What can I help you with today?"
 
 function Message({ msg }) {
@@ -31,6 +22,7 @@ export default function IntelixAssist() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [apiConnected, setApiConnected] = useState(null)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -45,6 +37,40 @@ export default function IntelixAssist() {
       .then(d => setApiConnected(Boolean(d.connected)))
       .catch(() => setApiConnected(false))
   }, [])
+
+  // Track the on-screen keyboard on iOS/Android via visualViewport. The
+  // difference between layout viewport and visual viewport is effectively
+  // the keyboard (plus any pinned browser UI). Apply it as padding-bottom on
+  // the page so the input stays above the keyboard.
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => {
+      const diff = window.innerHeight - vv.height - vv.offsetTop
+      setKeyboardHeight(diff > 40 ? diff : 0)
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
+
+  // When the keyboard actually opens, make sure the focused input is in view.
+  useEffect(() => {
+    if (keyboardHeight > 0 && document.activeElement === inputRef.current) {
+      inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }
+  }, [keyboardHeight])
+
+  const handleFocus = () => {
+    // Give iOS a beat to start opening the keyboard, then pull the input into view.
+    setTimeout(() => {
+      inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }, 120)
+  }
 
   const send = async (text) => {
     const content = text || input.trim()
@@ -87,7 +113,11 @@ export default function IntelixAssist() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+    <div style={{
+      display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden',
+      paddingBottom: keyboardHeight || undefined,
+      transition: 'padding-bottom 0.15s ease',
+    }}>
 
       {/* TOPBAR */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
@@ -112,20 +142,6 @@ export default function IntelixAssist() {
       {/* MESSAGES */}
       <div style={{ flex: 1, overflowY: 'scroll', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '20px 24px' }}>
         <div style={{ maxWidth: 760, margin: '0 auto' }}>
-
-          {messages.length === 1 && (
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>Suggested questions</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {SUGGESTED.map((s, i) => (
-                  <div key={i} onClick={() => send(s.label)} style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', transition: 'all 0.12s' }}>
-                    <div style={{ fontSize: 9.5, fontWeight: 700, color: s.cat === 'Control4' ? 'var(--accent)' : '#534AB7', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 4 }}>{s.cat}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.4 }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {messages.map((msg, i) => <Message key={i} msg={msg} />)}
 
@@ -152,6 +168,7 @@ export default function IntelixAssist() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKey}
+              onFocus={handleFocus}
               placeholder="Ask anything about Control4, Composer Pro, jobs, proposals..."
               rows={1}
               style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', resize: 'none', fontSize: 13, color: 'var(--text)', fontFamily: 'var(--font)', lineHeight: 1.5, maxHeight: 120, overflowY: 'auto' }}
