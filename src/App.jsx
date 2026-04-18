@@ -53,7 +53,7 @@ const NAV = [
 const BOTTOM_NAV = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { path: '/jobs', label: 'Jobs', icon: Briefcase },
-  { path: '/tickets', label: 'Tickets', icon: HeadphonesIcon },
+  { path: '/composer', label: 'Composer', icon: Wrench },
   { path: '/calendar', label: 'Calendar', icon: CalendarDays },
   { path: '/assist', label: 'Assist', icon: Bot },
 ]
@@ -264,7 +264,10 @@ function AppShell({ user, dark, setDark, logout }) {
       </aside>
 
       {/* Main content */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+      <main style={{
+        flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0,
+        paddingBottom: isMobile ? 'calc(56px + env(safe-area-inset-bottom))' : 0,
+      }}>
         <Suspense fallback={
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13, fontFamily: 'var(--font)' }}>Loading…</div>
         }>
@@ -292,10 +295,13 @@ function AppShell({ user, dark, setDark, logout }) {
       {/* Mobile bottom nav */}
       {isMobile && (
         <nav style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
           display: 'flex',
           background: 'var(--bg2)',
           borderTop: '1px solid var(--border2)',
-          flexShrink: 0,
           paddingBottom: 'env(safe-area-inset-bottom)',
           zIndex: 80,
         }}>
