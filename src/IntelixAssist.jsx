@@ -1,14 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 
-const SUGGESTED = [
-  { label: 'How do I bind a Lutron RadioRA 3 driver in Composer Pro?', cat: 'Control4' },
-  { label: 'What are the steps to connect to Director remotely?', cat: 'Control4' },
-  { label: 'How do I set up a Good Morning scene with lighting and thermostat?', cat: 'Control4' },
-  { label: 'What is the difference between EA-3 and EA-5?', cat: 'Control4' },
-  { label: 'Draft a follow-up email to a client after installation', cat: 'Business' },
-  { label: 'What should I include in a scope of work for a full AV job?', cat: 'Business' },
-]
-
 const GREETING = "Hi — I'm Intellix Assist. I can help with Control4 programming, Composer Pro, proposals, client communication, and anything else your team needs. What can I help you with today?"
 
 function Message({ msg }) {
@@ -112,20 +103,6 @@ export default function IntelixAssist() {
       {/* MESSAGES */}
       <div style={{ flex: 1, overflowY: 'scroll', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '20px 24px' }}>
         <div style={{ maxWidth: 760, margin: '0 auto' }}>
-
-          {messages.length === 1 && (
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>Suggested questions</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {SUGGESTED.map((s, i) => (
-                  <div key={i} onClick={() => send(s.label)} style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', transition: 'all 0.12s' }}>
-                    <div style={{ fontSize: 9.5, fontWeight: 700, color: s.cat === 'Control4' ? 'var(--accent)' : '#534AB7', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 4 }}>{s.cat}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.4 }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {messages.map((msg, i) => <Message key={i} msg={msg} />)}
 
