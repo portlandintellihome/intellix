@@ -128,7 +128,7 @@ function AppShell({ user, dark, setDark, logout }) {
 
   return (
     <div style={{
-      height: '100vh',
+      height: '100dvh',
       display: 'flex',
       flexDirection: isMobile ? 'column' : 'row',
       background: 'var(--bg)',
@@ -352,6 +352,12 @@ export default function App() {
       .finally(() => setAuthChecking(false))
   }, [])
 
+  // Keep html element in sync with the in-app theme toggle so html/body
+  // (which sit outside the app wrapper) pick up the correct --bg value.
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark)
+  }, [dark])
+
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY)
     setUser(null)
@@ -359,7 +365,7 @@ export default function App() {
 
   if (authChecking) {
     return (
-      <div className={dark ? 'dark' : ''} style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', color: 'var(--text3)', fontSize: 13, fontFamily: 'var(--font)' }}>
+      <div className={dark ? 'dark' : ''} style={{ height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', color: 'var(--text3)', fontSize: 13, fontFamily: 'var(--font)' }}>
         Loading…
       </div>
     )
