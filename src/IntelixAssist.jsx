@@ -22,7 +22,6 @@ export default function IntelixAssist() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [apiConnected, setApiConnected] = useState(null)
-  const [keyboardHeight, setKeyboardHeight] = useState(0)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -37,40 +36,6 @@ export default function IntelixAssist() {
       .then(d => setApiConnected(Boolean(d.connected)))
       .catch(() => setApiConnected(false))
   }, [])
-
-  // Track the on-screen keyboard on iOS/Android via visualViewport. The
-  // difference between layout viewport and visual viewport is effectively
-  // the keyboard (plus any pinned browser UI). Apply it as padding-bottom on
-  // the page so the input stays above the keyboard.
-  useEffect(() => {
-    const vv = window.visualViewport
-    if (!vv) return
-    const update = () => {
-      const diff = window.innerHeight - vv.height - vv.offsetTop
-      setKeyboardHeight(diff > 40 ? diff : 0)
-    }
-    update()
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-    }
-  }, [])
-
-  // When the keyboard actually opens, make sure the focused input is in view.
-  useEffect(() => {
-    if (keyboardHeight > 0 && document.activeElement === inputRef.current) {
-      inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-    }
-  }, [keyboardHeight])
-
-  const handleFocus = () => {
-    // Give iOS a beat to start opening the keyboard, then pull the input into view.
-    setTimeout(() => {
-      inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-    }, 120)
-  }
 
   const send = async (text) => {
     const content = text || input.trim()
@@ -113,11 +78,7 @@ export default function IntelixAssist() {
   }
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden',
-      paddingBottom: keyboardHeight || undefined,
-      transition: 'padding-bottom 0.15s ease',
-    }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', background: 'var(--bg)' }}>
 
       {/* TOPBAR */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
@@ -139,9 +100,11 @@ export default function IntelixAssist() {
         </div>
       )}
 
-      {/* MESSAGES */}
-      <div style={{ flex: 1, overflowY: 'scroll', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '20px 24px' }}>
-        <div style={{ maxWidth: 760, margin: '0 auto' }}>
+      {/* SCROLL AREA — messages + sticky input are both direct children so the
+          input sticks to the bottom of the scroll viewport. When iOS opens the
+          keyboard it naturally scrolls the focused sticky input into view. */}
+      <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', background: 'var(--bg)' }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', padding: '20px 24px 0' }}>
 
           {messages.map((msg, i) => <Message key={i} msg={msg} />)}
 
@@ -157,31 +120,30 @@ export default function IntelixAssist() {
           )}
           <div ref={bottomRef} />
         </div>
-      </div>
 
-      {/* INPUT */}
-      <div style={{ padding: '14px 24px', background: 'var(--bg2)', borderTop: '1px solid var(--border2)', flexShrink: 0 }}>
-        <div style={{ maxWidth: 760, margin: '0 auto' }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: '8px 8px 8px 14px' }}>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKey}
-              onFocus={handleFocus}
-              placeholder="Ask anything about Control4, Composer Pro, jobs, proposals..."
-              rows={1}
-              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', resize: 'none', fontSize: 13, color: 'var(--text)', fontFamily: 'var(--font)', lineHeight: 1.5, maxHeight: 120, overflowY: 'auto' }}
-            />
-            <button
-              onClick={() => send()}
-              disabled={!input.trim() || loading}
-              style={{ width: 34, height: 34, borderRadius: 8, border: 'none', background: input.trim() && !loading ? '#1d1d1f' : 'var(--bg4)', color: input.trim() && !loading ? '#fff' : 'var(--text3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: input.trim() && !loading ? 'pointer' : 'not-allowed', flexShrink: 0, transition: 'all 0.15s' }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            </button>
+        {/* INPUT — direct child of the scroll area, sticky to the bottom. */}
+        <div style={{ position: 'sticky', bottom: 0, background: 'var(--bg2)', borderTop: '1px solid var(--border2)', padding: '14px 24px' }}>
+          <div style={{ maxWidth: 760, margin: '0 auto' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: '8px 8px 8px 14px' }}>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKey}
+                placeholder="Ask anything about Control4, Composer Pro, jobs, proposals..."
+                rows={1}
+                style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', resize: 'none', fontSize: 13, color: 'var(--text)', fontFamily: 'var(--font)', lineHeight: 1.5, maxHeight: 120, overflowY: 'auto' }}
+              />
+              <button
+                onClick={() => send()}
+                disabled={!input.trim() || loading}
+                style={{ width: 34, height: 34, borderRadius: 8, border: 'none', background: input.trim() && !loading ? '#1d1d1f' : 'var(--bg4)', color: input.trim() && !loading ? '#fff' : 'var(--text3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: input.trim() && !loading ? 'pointer' : 'not-allowed', flexShrink: 0, transition: 'all 0.15s' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--text3)', textAlign: 'center', marginTop: 8 }}>Press Enter to send · Shift + Enter for new line</div>
           </div>
-          <div style={{ fontSize: 10.5, color: 'var(--text3)', textAlign: 'center', marginTop: 8 }}>Press Enter to send · Shift + Enter for new line</div>
         </div>
       </div>
 
