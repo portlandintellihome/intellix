@@ -48,3 +48,15 @@ html.dark, .dark {
   --text2: #8892a4;
   --text3: #4a5568;
 }
+
+/* Mobile: inputs at 16px so iOS doesn't auto-zoom on focus. */
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+  body {
+    line-height: 1.5;
+  }
+}
