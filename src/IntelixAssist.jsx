@@ -123,9 +123,14 @@ export default function IntelixAssist() {
         </div>
       </div>
 
-      {/* Input */}
+      {/* Input — form wrapper so the iOS keyboard's Send key submits via
+          the standard form-submit path. enterKeyHint="send" re-labels the
+          return key to "Send" on iOS and Android. */}
       <div style={{ flexShrink: 0, background: 'var(--bg2)', borderTop: '1px solid var(--border2)', padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}>
-        <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', gap: 8, alignItems: 'flex-end', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 20, padding: '6px 6px 6px 14px' }}>
+        <form
+          onSubmit={(e) => { e.preventDefault(); send() }}
+          style={{ maxWidth: 760, margin: '0 auto', display: 'flex', gap: 8, alignItems: 'flex-end', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 20, padding: '6px 6px 6px 14px' }}
+        >
           <textarea
             ref={inputRef}
             value={input}
@@ -133,17 +138,19 @@ export default function IntelixAssist() {
             onKeyDown={handleKey}
             placeholder="Message"
             rows={1}
+            inputMode="text"
+            enterKeyHint="send"
             style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', resize: 'none', fontSize: 16, color: 'var(--text)', fontFamily: 'var(--font)', lineHeight: 1.4, maxHeight: 140, padding: '6px 0' }}
           />
           <button
-            onClick={() => send()}
+            type="submit"
             disabled={!input.trim() || loading}
             style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', background: input.trim() && !loading ? 'var(--accent)' : 'var(--bg4)', color: input.trim() && !loading ? '#fff' : 'var(--text3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: input.trim() && !loading ? 'pointer' : 'not-allowed', flexShrink: 0, transition: 'background 0.15s' }}
             aria-label="Send"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
           </button>
-        </div>
+        </form>
       </div>
 
       <style>{`
