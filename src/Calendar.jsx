@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiGet } from './lib/api'
 import { colorForInitials } from './lib/color'
+import { useIsMobile } from './lib/useIsMobile'
 
 const PALETTE = ['#0066cc', '#34c759', '#534AB7', '#ff9500', '#ff3b30']
 
@@ -97,6 +98,7 @@ function NewJobModal({ onClose, selectedDate, team }) {
 
 export default function CalendarPage() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const today = new Date()
   const [view, setView] = useState('month')
   const [currentMonth, setCurrentMonth] = useState(today.getMonth())
@@ -163,30 +165,47 @@ export default function CalendarPage() {
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
       {showNew && <NewJobModal onClose={() => setShowNew(false)} selectedDate={selectedDate} team={team} />}
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Calendar</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={view === 'month' ? prevMonth : () => setCurrentWeek(w => w - 1)} style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>‹</button>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', minWidth: 160, textAlign: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '10px 14px' : '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 16, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', flexShrink: 0 }}>Calendar</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 8, minWidth: 0 }}>
+            <button aria-label="Previous" onClick={view === 'month' ? prevMonth : () => setCurrentWeek(w => w - 1)} style={{ width: isMobile ? 36 : 28, height: isMobile ? 36 : 28, borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>‹</button>
+            <div style={{ fontSize: isMobile ? 13 : 13, fontWeight: 700, color: 'var(--text)', minWidth: isMobile ? 0 : 160, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {view === 'month'
                 ? `${MONTHS[monthIndex]} ${currentYear}`
                 : `${weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — ${weekDays[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
               }
             </div>
-            <button onClick={view === 'month' ? nextMonth : () => setCurrentWeek(w => w + 1)} style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>›</button>
-            <button onClick={() => { setCurrentMonth(today.getMonth()); setCurrentYear(today.getFullYear()); setCurrentWeek(0) }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text2)', fontSize: 11, fontWeight: 600, fontFamily: 'var(--font)' }}>Today</button>
+            <button aria-label="Next" onClick={view === 'month' ? nextMonth : () => setCurrentWeek(w => w + 1)} style={{ width: isMobile ? 36 : 28, height: isMobile ? 36 : 28, borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>›</button>
+            {!isMobile && (
+              <button onClick={() => { setCurrentMonth(today.getMonth()); setCurrentYear(today.getFullYear()); setCurrentWeek(0) }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text2)', fontSize: 11, fontWeight: 600, fontFamily: 'var(--font)' }}>Today</button>
+            )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div style={{ display: 'flex', background: 'var(--bg3)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
+        {!isMobile && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ display: 'flex', background: 'var(--bg3)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
+              {['month', 'week'].map(v => (
+                <button key={v} onClick={() => setView(v)} style={{ padding: '6px 14px', border: 'none', background: view === v ? 'var(--bg2)' : 'transparent', color: view === v ? 'var(--text)' : 'var(--text2)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', textTransform: 'capitalize' }}>{v}</button>
+              ))}
+            </div>
+            <button onClick={() => setShowNew(true)} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#1d1d1f', color: '#fff', fontFamily: 'var(--font)' }}>+ Schedule job</button>
+          </div>
+        )}
+      </div>
+
+      {isMobile && (
+        <div style={{ display: 'flex', gap: 8, padding: '8px 14px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0, alignItems: 'center' }}>
+          <button onClick={() => { setCurrentMonth(today.getMonth()); setCurrentYear(today.getFullYear()); setCurrentWeek(0) }} style={{ padding: '7px 14px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text2)', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)' }}>Today</button>
+          <div style={{ display: 'flex', background: 'var(--bg3)', borderRadius: 7, border: '1px solid var(--border)', overflow: 'hidden' }}>
             {['month', 'week'].map(v => (
-              <button key={v} onClick={() => setView(v)} style={{ padding: '6px 14px', border: 'none', background: view === v ? 'var(--bg2)' : 'transparent', color: view === v ? 'var(--text)' : 'var(--text2)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', textTransform: 'capitalize' }}>{v}</button>
+              <button key={v} onClick={() => setView(v)} style={{ padding: '7px 12px', border: 'none', background: view === v ? 'var(--bg2)' : 'transparent', color: view === v ? 'var(--text)' : 'var(--text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', textTransform: 'capitalize' }}>{v}</button>
             ))}
           </div>
-          <button onClick={() => setShowNew(true)} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#1d1d1f', color: '#fff', fontFamily: 'var(--font)' }}>+ Schedule job</button>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => setShowNew(true)} style={{ padding: '8px 14px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#1d1d1f', color: '#fff', fontFamily: 'var(--font)' }}>+ Schedule</button>
         </div>
-      </div>
+      )}
 
       {view === 'month' && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 24px' }}>

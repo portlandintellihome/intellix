@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { apiGet } from './lib/api'
+import { useIsMobile } from './lib/useIsMobile'
 
 const DRIVER_CATS = ['All', 'AV', 'Audio', 'Lighting', 'HVAC', 'Security', 'Network', 'Shades']
 
@@ -70,6 +71,8 @@ function generateChecklist(form) {
 function BuildForm({ onGenerate, existingJobs, drivers }) {
   const EXISTING_JOBS = existingJobs
   const DRIVERS = drivers
+  const isMobile = useIsMobile()
+  const [driversOpen, setDriversOpen] = useState(false)
   const [form, setForm] = useState({
     projectName: '', client: '', linkedJob: '', controller: '',
     ovrc: '', version: '', installer: '',
@@ -100,9 +103,51 @@ function BuildForm({ onGenerate, existingJobs, drivers }) {
     return matchCat && matchSearch
   })
 
+  const driverPicker = (
+    <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border2)', background: 'var(--bg3)' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Driver library</div>
+        <input style={{ ...inp, fontSize: 12 }} placeholder="Search drivers..." value={driverSearch} onChange={e => setDriverSearch(e.target.value)} />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+          {DRIVER_CATS.map(cat => (
+            <button key={cat} onClick={() => setDriverCat(cat)} style={{ padding: '3px 8px', borderRadius: 5, fontSize: 10.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${driverCat === cat ? 'var(--accent)' : 'var(--border)'}`, background: driverCat === cat ? 'rgba(0,102,204,0.08)' : 'transparent', color: driverCat === cat ? 'var(--accent)' : 'var(--text2)', fontFamily: 'var(--font)' }}>{cat}</button>
+          ))}
+        </div>
+      </div>
+      {form.selectedDrivers.length > 0 && (
+        <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border2)', background: 'rgba(0,102,204,0.04)' }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)', marginBottom: 5 }}>SELECTED — {form.selectedDrivers.length}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {form.selectedDrivers.map(d => (
+              <span key={d.name} onClick={() => toggleDriver(d)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 4, fontSize: 10.5, fontWeight: 600, background: 'rgba(0,102,204,0.1)', color: 'var(--accent)', cursor: 'pointer' }}>
+                {d.name} ×
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+        {filteredDrivers.map(driver => {
+          const selected = form.selectedDrivers.find(d => d.name === driver.name)
+          return (
+            <div key={driver.name} onClick={() => toggleDriver(driver)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderBottom: '1px solid var(--border2)', cursor: 'pointer', background: selected ? 'rgba(0,102,204,0.04)' : 'transparent', transition: 'background 0.1s' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: selected ? 'var(--accent)' : 'var(--text)' }}>{driver.name}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--text3)' }}>{driver.cat} · {driver.conn}</div>
+              </div>
+              <div style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'}`, background: selected ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {selected && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>✓</span>}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, maxWidth: 1100 }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 14px' : '20px 24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: 20, maxWidth: 1100 }}>
 
         {/* LEFT — FORM */}
         <div>
@@ -154,6 +199,35 @@ function BuildForm({ onGenerate, existingJobs, drivers }) {
             <button onClick={addRoom} style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px dashed var(--border)', background: 'transparent', color: 'var(--text3)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', marginTop: 4 }}>+ Add room</button>
           </div>
 
+          {/* DRIVERS (mobile only — collapsible, desktop renders in side column) */}
+          {isMobile && (
+            <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, marginBottom: 14, overflow: 'hidden' }}>
+              <button
+                type="button"
+                onClick={() => setDriversOpen(o => !o)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '14px 16px', background: 'transparent', border: 'none', cursor: 'pointer',
+                  fontFamily: 'var(--font)', color: 'var(--text)',
+                }}
+                aria-expanded={driversOpen}
+              >
+                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Select drivers</span>
+                  <span style={{ fontSize: 12, color: 'var(--text2)' }}>
+                    {form.selectedDrivers.length > 0
+                      ? `${form.selectedDrivers.length} selected`
+                      : 'Tap to pick from library'}
+                  </span>
+                </span>
+                <span style={{ fontSize: 16, color: 'var(--text3)', fontWeight: 600 }}>{driversOpen ? '▴' : '▾'}</span>
+              </button>
+              {driversOpen && (
+                <div style={{ padding: '0 12px 12px' }}>{driverPicker}</div>
+              )}
+            </div>
+          )}
+
           {/* SCENES */}
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '16px', marginBottom: 14 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 14 }}>Scenes & programming</div>
@@ -171,48 +245,12 @@ function BuildForm({ onGenerate, existingJobs, drivers }) {
           </button>
         </div>
 
-        {/* RIGHT — DRIVER LIBRARY */}
-        <div style={{ position: 'sticky', top: 0 }}>
-          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border2)', background: 'var(--bg3)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Driver library</div>
-              <input style={{ ...inp, fontSize: 12 }} placeholder="Search drivers..." value={driverSearch} onChange={e => setDriverSearch(e.target.value)} />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
-                {DRIVER_CATS.map(cat => (
-                  <button key={cat} onClick={() => setDriverCat(cat)} style={{ padding: '3px 8px', borderRadius: 5, fontSize: 10.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${driverCat === cat ? 'var(--accent)' : 'var(--border)'}`, background: driverCat === cat ? 'rgba(0,102,204,0.08)' : 'transparent', color: driverCat === cat ? 'var(--accent)' : 'var(--text2)', fontFamily: 'var(--font)' }}>{cat}</button>
-                ))}
-              </div>
-            </div>
-            {form.selectedDrivers.length > 0 && (
-              <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border2)', background: 'rgba(0,102,204,0.04)' }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)', marginBottom: 5 }}>SELECTED — {form.selectedDrivers.length}</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                  {form.selectedDrivers.map(d => (
-                    <span key={d.name} onClick={() => toggleDriver(d)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 4, fontSize: 10.5, fontWeight: 600, background: 'rgba(0,102,204,0.1)', color: 'var(--accent)', cursor: 'pointer' }}>
-                      {d.name} ×
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div style={{ maxHeight: 420, overflowY: 'auto' }}>
-              {filteredDrivers.map(driver => {
-                const selected = form.selectedDrivers.find(d => d.name === driver.name)
-                return (
-                  <div key={driver.name} onClick={() => toggleDriver(driver)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderBottom: '1px solid var(--border2)', cursor: 'pointer', background: selected ? 'rgba(0,102,204,0.04)' : 'transparent', transition: 'background 0.1s' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: selected ? 'var(--accent)' : 'var(--text)' }}>{driver.name}</div>
-                      <div style={{ fontSize: 10.5, color: 'var(--text3)' }}>{driver.cat} · {driver.conn}</div>
-                    </div>
-                    <div style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'}`, background: selected ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {selected && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>✓</span>}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+        {/* RIGHT — DRIVER LIBRARY (desktop only; mobile gets an inline collapsible section above) */}
+        {!isMobile && (
+          <div style={{ position: 'sticky', top: 0 }}>
+            {driverPicker}
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
