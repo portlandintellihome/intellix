@@ -11,6 +11,7 @@
     "start": "node server/index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "@fontsource/montserrat": "^5.2.8",
     "axios": "^1.15.0",
     "bcrypt": "^6.0.0",

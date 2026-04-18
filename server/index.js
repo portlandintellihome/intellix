@@ -15,6 +15,7 @@ import driversRouter from './routes/drivers.js'
 import proposalsRouter from './routes/proposals.js'
 import composerBuildsRouter from './routes/composer-builds.js'
 import checkInsRouter from './routes/check-ins.js'
+import assistRouter from './routes/assist.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const distDir = path.resolve(__dirname, '..', 'dist')
@@ -39,6 +40,7 @@ app.use('/api/drivers', driversRouter)
 app.use('/api/proposals', proposalsRouter)
 app.use('/api/composer-builds', composerBuildsRouter)
 app.use('/api/check-ins', checkInsRouter)
+app.use('/api/assist', assistRouter)
 
 if (fs.existsSync(distDir)) {
   app.use(express.static(distDir))

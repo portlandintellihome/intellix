@@ -9,9 +9,7 @@ const SUGGESTED = [
   { label: 'What should I include in a scope of work for a full AV job?', cat: 'Business' },
 ]
 
-const PLACEHOLDER_RESPONSES = {
-  default: "Intellix Assist is ready — connect your Anthropic API key in Integrations & APIs to enable AI responses. Once connected, I can help with Control4 programming, Composer Pro, proposals, client communication, and anything else your team needs.",
-}
+const GREETING = "Hi — I'm Intellix Assist. I can help with Control4 programming, Composer Pro, proposals, client communication, and anything else your team needs. What can I help you with today?"
 
 function Message({ msg }) {
   const isUser = msg.role === 'user'
@@ -29,12 +27,10 @@ function Message({ msg }) {
 }
 
 export default function IntelixAssist() {
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hi — I\'m Intellix Assist. I can help with Control4 programming, Composer Pro, proposals, client communication, and anything else your team needs. What can I help you with today?' }
-  ])
+  const [messages, setMessages] = useState([{ role: 'assistant', content: GREETING }])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [apiConnected] = useState(false)
+  const [apiConnected, setApiConnected] = useState(null)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -42,22 +38,41 @@ export default function IntelixAssist() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  useEffect(() => {
+    const base = import.meta.env.VITE_API_URL || ''
+    fetch(`${base}/api/assist/status`)
+      .then(r => r.ok ? r.json() : { connected: false })
+      .then(d => setApiConnected(Boolean(d.connected)))
+      .catch(() => setApiConnected(false))
+  }, [])
+
   const send = async (text) => {
     const content = text || input.trim()
     if (!content || loading) return
     setInput('')
 
-    setMessages(m => [...m, { role: 'user', content }])
+    const nextMessages = [...messages, { role: 'user', content }]
+    setMessages(nextMessages)
     setLoading(true)
 
-    await new Promise(r => setTimeout(r, 800))
-
-    setMessages(m => [...m, {
-      role: 'assistant',
-      content: PLACEHOLDER_RESPONSES.default
-    }])
-    setLoading(false)
-    inputRef.current?.focus()
+    try {
+      const base = import.meta.env.VITE_API_URL || ''
+      const res = await fetch(`${base}/api/assist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`)
+      setMessages(m => [...m, { role: 'assistant', content: data.reply || '' }])
+    } catch (err) {
+      setMessages(m => [...m, { role: 'assistant', content: `⚠️ ${err.message}`, error: true }])
+    } finally {
+      setLoading(false)
+      inputRef.current?.focus()
+    }
   }
 
   const handleKey = (e) => {
@@ -68,7 +83,7 @@ export default function IntelixAssist() {
   }
 
   const clearChat = () => {
-    setMessages([{ role: 'assistant', content: 'Hi — I\'m Intellix Assist. I can help with Control4 programming, Composer Pro, proposals, client communication, and anything else your team needs. What can I help you with today?' }])
+    setMessages([{ role: 'assistant', content: GREETING }])
   }
 
   return (
@@ -87,10 +102,10 @@ export default function IntelixAssist() {
       </div>
 
       {/* API WARNING */}
-      {!apiConnected && (
+      {apiConnected === false && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 24px', background: 'rgba(255,149,0,0.06)', borderBottom: '1px solid rgba(255,149,0,0.15)', flexShrink: 0 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c93400" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span style={{ fontSize: 11.5, color: '#c93400', fontWeight: 500, flex: 1 }}>Anthropic API key not connected — responses are placeholders. Add your key in <strong>Integrations & APIs</strong> to enable live AI.</span>
+          <span style={{ fontSize: 11.5, color: '#c93400', fontWeight: 500, flex: 1 }}>ANTHROPIC_API_KEY is not set on the backend — Intellix Assist will return an error until it's configured.</span>
         </div>
       )}
 
