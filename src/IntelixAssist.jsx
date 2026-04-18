@@ -84,7 +84,7 @@ export default function IntelixAssist() {
   //    naturally when the keyboard opens (helped by interactive-widget=
   //    resizes-content on the viewport meta).
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: 'var(--bg)' }}>
 
       {/* Header */}
       <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)' }}>
