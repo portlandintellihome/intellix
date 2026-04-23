@@ -31,9 +31,17 @@ function computeInitials(name) {
 }
 
 router.post('/register', requireAuth, requireAdmin, async (req, res, next) => {
+  console.log('[auth:register] request', {
+    by_user_id: req.user?.id,
+    name: req.body?.name,
+    email: req.body?.email,
+    role: req.body?.role,
+    has_password: Boolean(req.body?.password),
+  })
   try {
     const { name, email, password, role } = req.body || {}
     if (!name || !email || !password) {
+      console.log('[auth:register] 400 missing field', { name: !!name, email: !!email, password: !!password })
       return res.status(400).json({ error: 'name, email, and password are required' })
     }
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS)
@@ -44,14 +52,24 @@ router.post('/register', requireAuth, requireAdmin, async (req, res, next) => {
          RETURNING *`,
         [name, email.toLowerCase(), hash, role, computeInitials(name)]
       )
+      console.log('[auth:register] ok', { id: rows[0].id, email: rows[0].email, role: rows[0].role })
       res.json({ user: publicUser(rows[0]) })
     } catch (err) {
+      console.error('[auth:register] db error', {
+        code: err?.code, message: err?.message, detail: err?.detail, column: err?.column, table: err?.table,
+      })
       if (err.code === '23505') {
         return res.status(409).json({ error: 'Email already registered' })
       }
+      if (err.code === '42703') {
+        return res.status(500).json({ error: `Schema out of date — users.${err.column || 'column'} is missing. Re-apply server/db/schema.sql on Railway.` })
+      }
       throw err
     }
-  } catch (err) { next(err) }
+  } catch (err) {
+    console.error('[auth:register] error', { name: err?.name, message: err?.message, code: err?.code, stack: err?.stack })
+    next(err)
+  }
 })
 
 router.post('/login', async (req, res, next) => {
@@ -79,9 +97,18 @@ router.get('/me', requireAuth, async (req, res, next) => {
 
 // Admin-only: create a team-member account with a temp password.
 router.post('/invite', requireAuth, requireAdmin, async (req, res, next) => {
+  console.log('[auth:invite] request', {
+    by_user_id: req.user?.id,
+    name: req.body?.name,
+    email: req.body?.email,
+    role: req.body?.role,
+    has_password: Boolean(req.body?.password),
+    has_phone: Boolean(req.body?.phone),
+  })
   try {
     const { name, email, role, password, phone } = req.body || {}
     if (!name || !email || !password) {
+      console.log('[auth:invite] 400 missing field', { name: !!name, email: !!email, password: !!password })
       return res.status(400).json({ error: 'name, email, and password are required' })
     }
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS)
@@ -92,14 +119,24 @@ router.post('/invite', requireAuth, requireAdmin, async (req, res, next) => {
          RETURNING *`,
         [name, email.toLowerCase(), hash, role, phone || null, computeInitials(name)]
       )
+      console.log('[auth:invite] ok', { id: rows[0].id, email: rows[0].email, role: rows[0].role })
       res.json({ user: publicUser(rows[0]) })
     } catch (err) {
+      console.error('[auth:invite] db error', {
+        code: err?.code, message: err?.message, detail: err?.detail, column: err?.column, table: err?.table,
+      })
       if (err.code === '23505') {
         return res.status(409).json({ error: 'Email already registered' })
       }
+      if (err.code === '42703') {
+        return res.status(500).json({ error: `Schema out of date — users.${err.column || 'column'} is missing. Re-apply server/db/schema.sql on Railway.` })
+      }
       throw err
     }
-  } catch (err) { next(err) }
+  } catch (err) {
+    console.error('[auth:invite] error', { name: err?.name, message: err?.message, code: err?.code, stack: err?.stack })
+    next(err)
+  }
 })
 
 router.post('/change-password', requireAuth, async (req, res, next) => {
