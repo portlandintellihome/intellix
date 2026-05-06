@@ -66,7 +66,27 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Internal server error' })
 })
 
+function logEnvDiagnostics() {
+  const key = process.env.ANTHROPIC_API_KEY
+  if (!key) {
+    console.warn('[server] ANTHROPIC_API_KEY is NOT set — AI features will return 503')
+    return
+  }
+  const trimmed = key.trim()
+  console.log('[server] ANTHROPIC_API_KEY present', {
+    length: key.length,
+    trimmedLength: trimmed.length,
+    hasWhitespace: trimmed.length !== key.length,
+    prefix: key.slice(0, 7), // "sk-ant-" — safe to log; identifies vendor only
+  })
+  if (trimmed.length !== key.length) {
+    console.warn('[server] ANTHROPIC_API_KEY contains leading/trailing whitespace — this WILL fail auth with Anthropic')
+  }
+}
+
 async function bootstrap() {
+  logEnvDiagnostics()
+
   if (process.env.DATABASE_URL) {
     try {
       await migrate()

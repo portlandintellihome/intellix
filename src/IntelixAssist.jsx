@@ -48,9 +48,13 @@ export default function IntelixAssist() {
 
     try {
       const base = import.meta.env.VITE_API_URL || ''
+      const token = localStorage.getItem('intellix_token')
       const res = await fetch(`${base}/api/assist`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
         }),

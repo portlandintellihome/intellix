@@ -109,17 +109,22 @@ test('honors messages[] input shape', async () => {
   assert.equal(result.reply, 'reply')
 })
 
-test('rejects empty input', async () => {
+test('rejects empty input AND logs invalid_input row', async () => {
+  const queryFn = makeQueryFn()
   await assert.rejects(
     processAIRequest(
       { taskType: 'assist_chat', userId: 1 },
-      { queryFn: makeQueryFn(), anthropic: makeAnthropic() },
+      { queryFn, anthropic: makeAnthropic() },
     ),
     err => err.code === 'invalid_input',
   )
+  const insert = queryFn.calls.find(c => /INSERT INTO ai_interactions/.test(c.sql))
+  assert.ok(insert, 'expected an audit-log row even on invalid_input')
+  assert.equal(insert.params[10], 'invalid_input')
 })
 
-test('rejects when conversation does not end with user', async () => {
+test('rejects when conversation does not end with user AND logs', async () => {
+  const queryFn = makeQueryFn()
   await assert.rejects(
     processAIRequest(
       {
@@ -130,10 +135,34 @@ test('rejects when conversation does not end with user', async () => {
           { role: 'assistant', content: 'hello' },
         ],
       },
-      { queryFn: makeQueryFn(), anthropic: makeAnthropic() },
+      { queryFn, anthropic: makeAnthropic() },
     ),
     err => err.code === 'invalid_input',
   )
+  const insert = queryFn.calls.find(c => /INSERT INTO ai_interactions/.test(c.sql))
+  assert.ok(insert)
+  assert.equal(insert.params[10], 'invalid_input')
+})
+
+test('logs missing_key row when ANTHROPIC_API_KEY is unset', async () => {
+  const queryFn = makeQueryFn()
+  // No anthropic client and no env key — production "key missing" path.
+  const prevKey = process.env.ANTHROPIC_API_KEY
+  delete process.env.ANTHROPIC_API_KEY
+  try {
+    await assert.rejects(
+      processAIRequest(
+        { taskType: 'assist_chat', userId: 1, prompt: 'hi' },
+        { queryFn },
+      ),
+      err => err.code === 'missing_key',
+    )
+    const insert = queryFn.calls.find(c => /INSERT INTO ai_interactions/.test(c.sql))
+    assert.ok(insert, 'expected an audit-log row when key is missing')
+    assert.equal(insert.params[10], 'missing_key')
+  } finally {
+    if (prevKey !== undefined) process.env.ANTHROPIC_API_KEY = prevKey
+  }
 })
 
 test('does not check opt-out when clientId is null', async () => {

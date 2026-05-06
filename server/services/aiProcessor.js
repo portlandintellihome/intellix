@@ -82,18 +82,29 @@ export async function processAIRequest(opts, deps = {}) {
 
   // Normalize input into a messages[] array for Anthropic.
   let convo
+  let invalidReason = null
   if (Array.isArray(messages) && messages.length > 0) {
     convo = messages
       .filter(m => (m.role === 'user' || m.role === 'assistant')
         && typeof m.content === 'string' && m.content.trim())
       .map(m => ({ role: m.role, content: m.content }))
     if (convo.length === 0 || convo[convo.length - 1].role !== 'user') {
-      throw makeError('invalid_input', 'conversation must end with a user message', 400)
+      invalidReason = 'conversation must end with a user message'
     }
   } else if (typeof prompt === 'string' && prompt.trim()) {
     convo = [{ role: 'user', content: prompt }]
   } else {
-    throw makeError('invalid_input', 'prompt or messages is required', 400)
+    invalidReason = 'prompt or messages is required'
+  }
+  if (invalidReason) {
+    await logInteraction(queryFn, {
+      userId, taskType, clientId, jobId, ticketId,
+      prompt: convo ? combinedText(convo) : null,
+      model,
+      status: 'invalid_input',
+      errorMessage: invalidReason,
+    })
+    throw makeError('invalid_input', invalidReason, 400)
   }
 
   // Per-client opt-out: refuse before anything else.
@@ -128,6 +139,13 @@ export async function processAIRequest(opts, deps = {}) {
   }
 
   if (!isAIConfigured() && !anthropicClient) {
+    await logInteraction(queryFn, {
+      userId, taskType, clientId, jobId, ticketId,
+      prompt: combinedText(convo),
+      model,
+      status: 'missing_key',
+      errorMessage: 'ANTHROPIC_API_KEY is not configured on the backend',
+    })
     throw makeError('missing_key', 'AI is not configured. Set ANTHROPIC_API_KEY on the backend.', 503)
   }
 
