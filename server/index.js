@@ -17,6 +17,7 @@ import composerBuildsRouter from './routes/composer-builds.js'
 import checkInsRouter from './routes/check-ins.js'
 import assistRouter from './routes/assist.js'
 import settingsRouter from './routes/settings.js'
+import { migrate } from './db/migrate.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const distDir = path.resolve(__dirname, '..', 'dist')
@@ -59,6 +60,22 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Internal server error' })
 })
 
-app.listen(PORT, () => {
-  console.log(`Intellix listening on http://localhost:${PORT}`)
-})
+async function bootstrap() {
+  if (process.env.DATABASE_URL) {
+    try {
+      await migrate()
+    } catch (err) {
+      console.error('[server] migration failed; refusing to start')
+      console.error(err)
+      process.exit(1)
+    }
+  } else {
+    console.warn('[server] DATABASE_URL not set — skipping migration')
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Intellix listening on http://localhost:${PORT}`)
+  })
+}
+
+bootstrap()
