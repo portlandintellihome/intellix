@@ -29,6 +29,7 @@ const SettingsPage = lazy(() => import('./Settings'))
 const Outreach = lazy(() => import('./Outreach'))
 const HomeDoc = lazy(() => import('./HomeDoc'))
 const Todos = lazy(() => import('./Todos'))
+const AiAudit = lazy(() => import('./AiAudit'))
 
 const TOKEN_KEY = 'intellix_token'
 
@@ -52,6 +53,7 @@ const NAV = [
   { path: '/team', label: 'Team', icon: Users2 },
   { path: '/integrations', label: 'Integrations & APIs', icon: Plug },
   { path: '/settings', label: 'Settings', icon: Settings },
+  { path: '/settings/ai-audit', label: 'AI audit log', icon: Bot },
 ]
 
 // Role-based access. Admin sees everything; other roles get an explicit
@@ -330,6 +332,7 @@ function AppShell({ user, dark, setDark, logout }) {
             <Route path="/reporting" element={guard('/reporting', <Reporting />)} />
             <Route path="/integrations" element={guard('/integrations', <Integrations />)} />
             <Route path="/settings" element={guard('/settings', <SettingsPage />)} />
+            <Route path="/settings/ai-audit" element={guard('/settings/ai-audit', <AiAudit />)} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

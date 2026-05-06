@@ -1,10 +1,9 @@
 import { Router } from 'express'
-import Anthropic from '@anthropic-ai/sdk'
+
+import { requireAuth } from '../middleware/auth.js'
+import { processAIRequest, isAIConfigured } from '../services/aiProcessor.js'
 
 const router = Router()
-
-const MODEL = 'claude-sonnet-4-6'
-const MAX_TOKENS = 4096
 
 const SYSTEM_PROMPT = `You are Intellix Assist, an AI helper for Control4 home automation installers at intellihomeAV.
 
@@ -19,89 +18,46 @@ You also help the business side of the job: drafting proposals, scope-of-work do
 
 Keep responses concise and practical. Prefer bullet points and step-by-step instructions over long prose. When recommending a fix in Composer Pro, include the specific menu path or button name. Assume the reader is a working installer on site, not a beginner.`
 
-function getClient() {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    const err = new Error('missing_key')
-    err.code = 'missing_key'
-    throw err
-  }
-  return new Anthropic()
-}
-
 router.get('/status', (_req, res) => {
-  res.json({ connected: Boolean(process.env.ANTHROPIC_API_KEY) })
+  res.json({ connected: isAIConfigured() })
 })
 
-router.post('/', async (req, res, next) => {
+router.post('/', requireAuth, async (req, res, next) => {
   const start = Date.now()
-  const requestedMessages = Array.isArray(req.body?.messages) ? req.body.messages.length : null
+  const { messages } = req.body || {}
   console.log('[assist] request', {
-    messages: requestedMessages,
-    hasKey: Boolean(process.env.ANTHROPIC_API_KEY),
-    model: MODEL,
+    messages: Array.isArray(messages) ? messages.length : null,
+    userId: req.user?.id,
   })
 
   try {
-    const { messages } = req.body || {}
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({ error: 'messages array is required' })
-    }
-
-    const convo = messages
-      .filter(m => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
-      .map(m => ({ role: m.role, content: m.content }))
-
-    if (convo.length === 0 || convo[convo.length - 1].role !== 'user') {
-      return res.status(400).json({ error: 'conversation must end with a user message' })
-    }
-
-    const client = getClient()
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: SYSTEM_PROMPT,
-      messages: convo,
+    const result = await processAIRequest({
+      taskType: 'assist_chat',
+      userId: req.user?.id ?? null,
+      messages,
+      systemPrompt: SYSTEM_PROMPT,
     })
-
-    const reply = response.content
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join('')
 
     console.log('[assist] ok', {
       ms: Date.now() - start,
-      stop_reason: response.stop_reason,
-      input_tokens: response.usage?.input_tokens,
-      output_tokens: response.usage?.output_tokens,
+      stop_reason: result.stop_reason,
+      input_tokens: result.usage.input_tokens,
+      output_tokens: result.usage.output_tokens,
     })
 
-    res.json({ reply })
+    res.json({ reply: result.reply })
   } catch (err) {
-    // Log everything we can — Anthropic API errors expose status, type,
-    // request_id, and headers that pinpoint the cause.
     console.error('[assist] error', {
-      name: err?.name,
-      message: err?.message,
-      status: err?.status,
-      code: err?.code,
-      type: err?.error?.type || err?.error?.error?.type,
-      request_id: err?.request_id || err?.headers?.['request-id'] || err?.headers?.['x-request-id'],
-      body: err?.error,
-      stack: err?.stack,
+      code: err.code,
+      message: err.message,
+      status: err.status,
     })
 
-    if (err.code === 'missing_key') {
-      return res.status(503).json({ error: 'Intellix Assist is not configured. Set ANTHROPIC_API_KEY on the backend.' })
-    }
-    if (err instanceof Anthropic.AuthenticationError) {
-      return res.status(401).json({ error: 'Anthropic API key is invalid.' })
-    }
-    if (err instanceof Anthropic.RateLimitError) {
-      return res.status(429).json({ error: 'The Anthropic API is rate-limiting requests. Try again in a moment.' })
-    }
-    if (err instanceof Anthropic.APIError) {
-      return res.status(err.status || 500).json({ error: err.message || 'Anthropic API error' })
-    }
+    if (err.code === 'invalid_input') return res.status(400).json({ error: err.message })
+    if (err.code === 'opt_out')      return res.status(403).json({ error: err.message })
+    if (err.code === 'blocked')      return res.status(422).json({ error: err.message, blocked: true })
+    if (err.code === 'missing_key')  return res.status(503).json({ error: 'Intellix Assist is not configured. Set ANTHROPIC_API_KEY on the backend.' })
+    if (err.status)                  return res.status(err.status).json({ error: err.message })
     next(err)
   }
 })

@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS clients (
   plan_start_date DATE,
   plan_renewal_date DATE,
   homedoc JSONB DEFAULT '{}',
+  ai_opt_out BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -38,6 +39,7 @@ CREATE TABLE IF NOT EXISTS clients (
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_tier TEXT DEFAULT 'None';
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_start_date DATE;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_renewal_date DATE;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS ai_opt_out BOOLEAN DEFAULT FALSE;
 
 -- Rename intellifile -> homedoc if the old column exists (and the new
 -- one doesn't yet). Idempotent: safe to re-run.
@@ -172,6 +174,27 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens (user_id);
+
+CREATE TABLE IF NOT EXISTS ai_interactions (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  task_type TEXT NOT NULL,
+  client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+  job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+  ticket_id INTEGER REFERENCES support_tickets(id) ON DELETE SET NULL,
+  redacted_prompt TEXT,
+  raw_response TEXT,
+  model TEXT,
+  tokens_input INTEGER,
+  tokens_output INTEGER,
+  status TEXT,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ai_interactions_user_id ON ai_interactions (user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_interactions_client_id ON ai_interactions (client_id);
+CREATE INDEX IF NOT EXISTS idx_ai_interactions_task_type ON ai_interactions (task_type);
+CREATE INDEX IF NOT EXISTS idx_ai_interactions_created_at ON ai_interactions (created_at DESC);
 
 CREATE TABLE IF NOT EXISTS todos (
   id SERIAL PRIMARY KEY,

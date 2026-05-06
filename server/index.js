@@ -16,6 +16,7 @@ import proposalsRouter from './routes/proposals.js'
 import composerBuildsRouter from './routes/composer-builds.js'
 import checkInsRouter from './routes/check-ins.js'
 import assistRouter from './routes/assist.js'
+import aiRouter from './routes/ai.js'
 import settingsRouter from './routes/settings.js'
 import reportingRouter from './routes/reporting.js'
 import todosRouter from './routes/todos.js'
@@ -45,6 +46,7 @@ app.use('/api/proposals', proposalsRouter)
 app.use('/api/composer-builds', composerBuildsRouter)
 app.use('/api/check-ins', checkInsRouter)
 app.use('/api/assist', assistRouter)
+app.use('/api/ai', aiRouter)
 app.use('/api/settings', settingsRouter)
 app.use('/api/reporting', reportingRouter)
 app.use('/api/todos', todosRouter)
