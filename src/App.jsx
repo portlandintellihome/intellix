@@ -9,6 +9,8 @@ import {
 import './index.css'
 import Login from './Login'
 import ChangePassword from './ChangePassword'
+import ForgotPassword from './ForgotPassword'
+import ResetPassword from './ResetPassword'
 import { useIsMobile } from './lib/useIsMobile'
 
 const Dashboard = lazy(() => import('./Dashboard'))
@@ -402,35 +404,40 @@ export default function App() {
     setUser(null)
   }
 
+  return (
+    <div className={dark ? 'dark' : ''}>
+      <BrowserRouter>
+        <AppRouter
+          user={user}
+          setUser={setUser}
+          dark={dark}
+          setDark={setDark}
+          authChecking={authChecking}
+          logout={logout}
+        />
+      </BrowserRouter>
+    </div>
+  )
+}
+
+function AppRouter({ user, setUser, dark, setDark, authChecking, logout }) {
+  const location = useLocation()
+
+  // Public auth-flow pages — accessible whether logged in or not, so the
+  // user can recover from an unknown-password situation without first
+  // signing in. Render before any auth gate.
+  if (location.pathname === '/forgot-password') return <ForgotPassword />
+  if (location.pathname === '/reset-password') return <ResetPassword />
+
   if (authChecking) {
     return (
-      <div className={dark ? 'dark' : ''} style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', color: 'var(--text3)', fontSize: 13, fontFamily: 'var(--font)' }}>
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', color: 'var(--text3)', fontSize: 13, fontFamily: 'var(--font)' }}>
         Loading…
       </div>
     )
   }
+  if (!user) return <Login onLogin={setUser} />
+  if (user.must_change_password) return <ChangePassword user={user} onDone={setUser} onLogout={logout} />
 
-  if (!user) {
-    return (
-      <div className={dark ? 'dark' : ''}>
-        <Login onLogin={setUser} />
-      </div>
-    )
-  }
-
-  if (user.must_change_password) {
-    return (
-      <div className={dark ? 'dark' : ''}>
-        <ChangePassword user={user} onDone={setUser} onLogout={logout} />
-      </div>
-    )
-  }
-
-  return (
-    <div className={dark ? 'dark' : ''}>
-      <BrowserRouter>
-        <AppShell user={user} dark={dark} setDark={setDark} logout={logout} />
-      </BrowserRouter>
-    </div>
-  )
+  return <AppShell user={user} dark={dark} setDark={setDark} logout={logout} />
 }

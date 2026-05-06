@@ -29,7 +29,7 @@ function StatusBadge({ status }) {
   )
 }
 
-function EmployeeCard({ emp }) {
+function EmployeeCard({ emp, onResetPassword, resetting }) {
   const bg = colorFor(emp.initials)
   return (
     <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -55,9 +55,47 @@ function EmployeeCard({ emp }) {
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTop: '1px solid var(--border2)' }}>
-        <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Current job</div>
-        <div style={{ fontSize: 11.5, fontWeight: 600, color: emp.job === '—' ? 'var(--text3)' : 'var(--text)' }}>{emp.job}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTop: '1px solid var(--border2)', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Current job</div>
+          <div style={{ fontSize: 11.5, fontWeight: 600, color: emp.job === '—' ? 'var(--text3)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{emp.job}</div>
+        </div>
+        <button
+          onClick={() => onResetPassword(emp)}
+          disabled={resetting}
+          style={{ padding: '6px 11px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: resetting ? 'wait' : 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontFamily: 'var(--font)', flexShrink: 0, opacity: resetting ? 0.6 : 1 }}
+        >
+          {resetting ? 'Resetting…' : 'Reset password'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ResetPasswordResultModal({ user, tempPassword, onClose }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 14, width: 460, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px 14px', borderBottom: '1px solid var(--border2)' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Password reset</div>
+          <button onClick={onClose} style={{ background: 'var(--bg4)', border: 'none', borderRadius: '50%', width: 26, height: 26, cursor: 'pointer', color: 'var(--text2)', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+        </div>
+        <div style={{ padding: '18px 22px' }}>
+          <div style={{ fontSize: 12.5, color: 'var(--text2)', marginBottom: 14, lineHeight: 1.5 }}>
+            Share this temporary password with <strong style={{ color: 'var(--text)' }}>{user.name}</strong>. They'll be required to set a new one on next sign-in. <strong style={{ color: 'var(--text)' }}>This password will not be shown again.</strong>
+          </div>
+          <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 4 }}>Email</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{user.email}</div>
+          </div>
+          <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 4 }}>Temporary password</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', userSelect: 'all' }}>{tempPassword}</div>
+          </div>
+        </div>
+        <div style={{ padding: '14px 22px', borderTop: '1px solid var(--border2)', display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={primaryBtn}>Done</button>
+        </div>
       </div>
     </div>
   )
@@ -176,6 +214,32 @@ export default function Team() {
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [resettingId, setResettingId] = useState(null)
+  const [resetResult, setResetResult] = useState(null)
+  const [resetError, setResetError] = useState('')
+
+  const handleResetPassword = async (emp) => {
+    if (resettingId) return
+    setResettingId(emp.id)
+    setResetError('')
+    try {
+      const base = import.meta.env.VITE_API_URL || ''
+      const token = localStorage.getItem('intellix_token')
+      const res = await fetch(`${base}/api/auth/admin-reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ user_id: emp.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`)
+      setResetResult({ user: data.user, tempPassword: data.tempPassword })
+    } catch (err) {
+      setResetError(err.message)
+      alert(`Couldn't reset password: ${err.message}`)
+    } finally {
+      setResettingId(null)
+    }
+  }
 
   useEffect(() => {
     apiGet('/api/team')
@@ -240,7 +304,14 @@ export default function Team() {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-            {employees.map(emp => <EmployeeCard key={emp.id} emp={emp} />)}
+            {employees.map(emp => (
+              <EmployeeCard
+                key={emp.id}
+                emp={emp}
+                onResetPassword={handleResetPassword}
+                resetting={resettingId === emp.id}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -252,6 +323,14 @@ export default function Team() {
             { ...u, initials: u.initials || initialsOf(u.name), job: '—' },
             ...list,
           ])}
+        />
+      )}
+
+      {resetResult && (
+        <ResetPasswordResultModal
+          user={resetResult.user}
+          tempPassword={resetResult.tempPassword}
+          onClose={() => setResetResult(null)}
         />
       )}
     </div>
