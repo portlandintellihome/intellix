@@ -20,6 +20,7 @@ import aiRouter from './routes/ai.js'
 import settingsRouter from './routes/settings.js'
 import reportingRouter from './routes/reporting.js'
 import todosRouter from './routes/todos.js'
+import supportRouter from './routes/support.js'
 import { migrate } from './db/migrate.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -50,11 +51,21 @@ app.use('/api/ai', aiRouter)
 app.use('/api/settings', settingsRouter)
 app.use('/api/reporting', reportingRouter)
 app.use('/api/todos', todosRouter)
+app.use('/api/support', supportRouter)
+
+// Public read-only access to uploaded support photos. The directory is
+// resolved the same way support.js resolves UPLOAD_DIR, so the static mount
+// matches whatever volume Railway provides at runtime.
+const uploadsRoot = process.env.UPLOAD_DIR
+  ? path.dirname(process.env.UPLOAD_DIR)
+  : (fs.existsSync('/uploads') ? '/uploads' : path.resolve(process.cwd(), 'uploads'))
+fs.mkdirSync(uploadsRoot, { recursive: true })
+app.use('/uploads', express.static(uploadsRoot, { fallthrough: true, maxAge: '1d' }))
 
 if (fs.existsSync(distDir)) {
   app.use(express.static(distDir))
   app.use((req, res, next) => {
-    if (req.path.startsWith('/api') || req.method !== 'GET') return next()
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.method !== 'GET') return next()
     res.sendFile(path.join(distDir, 'index.html'))
   })
 } else {

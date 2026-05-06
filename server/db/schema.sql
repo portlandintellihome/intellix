@@ -128,6 +128,19 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 -- Backfill for the reporting route's avg-resolution-time metric.
 ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
 
+-- Public support intake: tickets that arrive via the /support form rather
+-- than the internal CRM. intake_source distinguishes them; contact_* fields
+-- snapshot the form data at submit time (independent of any matched client
+-- record); attachment_url points at the uploaded photo (if any); raw_payload
+-- holds the full intake JSON for replay/debugging.
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS intake_source TEXT DEFAULT 'internal';
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS contact_name TEXT;
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS contact_email TEXT;
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS contact_phone TEXT;
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS contact_address TEXT;
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS attachment_url TEXT;
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS raw_payload JSONB;
+
 CREATE TABLE IF NOT EXISTS inventory (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,

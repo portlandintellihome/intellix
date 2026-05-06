@@ -11,6 +11,7 @@ import Login from './Login'
 import ChangePassword from './ChangePassword'
 import ForgotPassword from './ForgotPassword'
 import ResetPassword from './ResetPassword'
+import Support from './Support'
 import { useIsMobile } from './lib/useIsMobile'
 
 const Dashboard = lazy(() => import('./Dashboard'))
@@ -434,6 +435,8 @@ function AppRouter({ user, setUser, dark, setDark, authChecking, logout }) {
   // signing in. Render before any auth gate.
   if (location.pathname === '/forgot-password') return <ForgotPassword />
   if (location.pathname === '/reset-password') return <ResetPassword />
+  // Public client-facing support intake form — no app chrome, no auth.
+  if (location.pathname === '/support') return <Support />
 
   if (authChecking) {
     return (
