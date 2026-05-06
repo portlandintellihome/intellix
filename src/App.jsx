@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom'
 import {
   LayoutDashboard, Briefcase, Users, HeadphonesIcon,
   CalendarDays, Wrench, Library, Package,
@@ -50,6 +50,35 @@ const NAV = [
   { path: '/settings', label: 'Settings', icon: Settings },
 ]
 
+// Role-based access. Admin sees everything; other roles get an explicit
+// allowlist of route paths. The user's role comes from the user object
+// loaded by /api/auth/me on mount — the JWT only carries id+email so we
+// rely on the freshly-fetched role from the server.
+const ROLE_ACCESS = {
+  Admin: '*',
+  Programmer: new Set(['/', '/jobs', '/composer', '/drivers', '/homedoc', '/assist', '/todo']),
+  Technician: new Set(['/', '/jobs', '/tickets', '/calendar', '/composer', '/todo']),
+}
+
+function canAccess(role, path) {
+  if (role === 'Admin') return true
+  const allowed = ROLE_ACCESS[role]
+  if (allowed) return allowed.has(path)
+  // Unknown role (legacy "Employee" etc.) — default to Dashboard only.
+  return path === '/'
+}
+
+// Filter NAV: drop items the role can't see, then drop section headers
+// whose entire group has been emptied.
+function visibleNav(role) {
+  const filtered = NAV.filter(item => item.section || canAccess(role, item.path))
+  return filtered.filter((item, i) => {
+    if (!item.section) return true
+    const next = filtered[i + 1]
+    return next && !next.section
+  })
+}
+
 const BOTTOM_NAV = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { path: '/jobs', label: 'Jobs', icon: Briefcase },
@@ -95,6 +124,9 @@ function AppShell({ user, dark, setDark, logout }) {
   // no bottom nav, no reserved padding. Keyboard rises naturally into the
   // collapsed viewport instead of fighting with a fixed nav bar.
   const assistFullScreen = isMobile && location.pathname === '/assist'
+  const nav = visibleNav(user.role)
+  const bottomNav = BOTTOM_NAV.filter(item => canAccess(user.role, item.path))
+  const guard = (path, element) => canAccess(user.role, path) ? element : <Navigate to="/" replace />
 
   // Close mobile sidebar whenever the route changes.
   useEffect(() => {
@@ -201,7 +233,7 @@ function AppShell({ user, dark, setDark, logout }) {
         </div>
 
         <nav style={{ flex: 1, padding: '4px 10px', overflowY: 'auto' }}>
-          {NAV.map((item, i) => {
+          {nav.map((item, i) => {
             if (item.section) return (
               <div key={i} style={{
                 fontSize: 10, fontWeight: 600, color: 'var(--text3)',
@@ -277,22 +309,23 @@ function AppShell({ user, dark, setDark, logout }) {
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13, fontFamily: 'var(--font)' }}>Loading…</div>
         }>
           <Routes>
-            <Route path="/" element={<Dashboard setupDone={false} />} />
-            <Route path="/jobs" element={<JobsProposals />} />
-            <Route path="/clients" element={<Clients />} />
-            <Route path="/tickets" element={<SupportTickets />} />
-            <Route path="/calendar" element={<CalendarPage />} />
-            <Route path="/outreach" element={<Outreach />} />
-            <Route path="/homedoc" element={<HomeDoc />} />
-            <Route path="/homedoc/:id" element={<HomeDoc />} />
-            <Route path="/composer" element={<ComposerBuilds />} />
-            <Route path="/drivers" element={<DriverLibrary />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/assist" element={<IntelixAssist />} />
-            <Route path="/team" element={<Team />} />
-            <Route path="/reporting" element={<Reporting />} />
-            <Route path="/integrations" element={<Integrations />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/" element={guard('/', <Dashboard setupDone={false} />)} />
+            <Route path="/jobs" element={guard('/jobs', <JobsProposals />)} />
+            <Route path="/clients" element={guard('/clients', <Clients />)} />
+            <Route path="/tickets" element={guard('/tickets', <SupportTickets />)} />
+            <Route path="/calendar" element={guard('/calendar', <CalendarPage />)} />
+            <Route path="/outreach" element={guard('/outreach', <Outreach />)} />
+            <Route path="/homedoc" element={guard('/homedoc', <HomeDoc />)} />
+            <Route path="/homedoc/:id" element={guard('/homedoc', <HomeDoc />)} />
+            <Route path="/composer" element={guard('/composer', <ComposerBuilds />)} />
+            <Route path="/drivers" element={guard('/drivers', <DriverLibrary />)} />
+            <Route path="/inventory" element={guard('/inventory', <Inventory />)} />
+            <Route path="/assist" element={guard('/assist', <IntelixAssist />)} />
+            <Route path="/team" element={guard('/team', <Team />)} />
+            <Route path="/reporting" element={guard('/reporting', <Reporting />)} />
+            <Route path="/integrations" element={guard('/integrations', <Integrations />)} />
+            <Route path="/settings" element={guard('/settings', <SettingsPage />)} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
       </main>
@@ -311,7 +344,7 @@ function AppShell({ user, dark, setDark, logout }) {
           paddingBottom: 'env(safe-area-inset-bottom)',
           zIndex: 80,
         }}>
-          {BOTTOM_NAV.map(item => {
+          {bottomNav.map(item => {
             const Icon = item.icon
             return (
               <NavLink
