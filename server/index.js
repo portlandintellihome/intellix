@@ -18,6 +18,7 @@ import checkInsRouter from './routes/check-ins.js'
 import assistRouter from './routes/assist.js'
 import settingsRouter from './routes/settings.js'
 import reportingRouter from './routes/reporting.js'
+import todosRouter from './routes/todos.js'
 import { migrate } from './db/migrate.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -46,6 +47,7 @@ app.use('/api/check-ins', checkInsRouter)
 app.use('/api/assist', assistRouter)
 app.use('/api/settings', settingsRouter)
 app.use('/api/reporting', reportingRouter)
+app.use('/api/todos', todosRouter)
 
 if (fs.existsSync(distDir)) {
   app.use(express.static(distDir))

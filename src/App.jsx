@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Briefcase, Users, HeadphonesIcon,
   CalendarDays, Wrench, Library, Package,
   Bot, Users2, BarChart3, Plug, Settings, LogOut, Mail, FolderOpen,
-  Menu, X
+  Menu, X, CheckSquare
 } from 'lucide-react'
 import './index.css'
 import Login from './Login'
@@ -28,6 +28,7 @@ const Integrations = lazy(() => import('./Integrations'))
 const SettingsPage = lazy(() => import('./Settings'))
 const Outreach = lazy(() => import('./Outreach'))
 const HomeDoc = lazy(() => import('./HomeDoc'))
+const Todos = lazy(() => import('./Todos'))
 
 const TOKEN_KEY = 'intellix_token'
 
@@ -39,6 +40,7 @@ const NAV = [
   { path: '/clients', label: 'Clients', icon: Users },
   { path: '/tickets', label: 'Support tickets', icon: HeadphonesIcon },
   { path: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { path: '/todos', label: 'To-dos', icon: CheckSquare },
   { path: '/outreach', label: 'Outreach', icon: Mail },
   { section: 'Workspace' },
   { path: '/composer', label: 'Composer builds', icon: Wrench },
@@ -58,8 +60,8 @@ const NAV = [
 // rely on the freshly-fetched role from the server.
 const ROLE_ACCESS = {
   Admin: '*',
-  Programmer: new Set(['/', '/jobs', '/composer', '/drivers', '/homedoc', '/assist', '/todo']),
-  Technician: new Set(['/', '/jobs', '/tickets', '/calendar', '/composer', '/todo']),
+  Programmer: new Set(['/', '/jobs', '/composer', '/drivers', '/homedoc', '/assist', '/todos']),
+  Technician: new Set(['/', '/jobs', '/tickets', '/calendar', '/composer', '/todos']),
 }
 
 function canAccess(role, path) {
@@ -316,6 +318,7 @@ function AppShell({ user, dark, setDark, logout }) {
             <Route path="/clients" element={guard('/clients', <Clients />)} />
             <Route path="/tickets" element={guard('/tickets', <SupportTickets />)} />
             <Route path="/calendar" element={guard('/calendar', <CalendarPage />)} />
+            <Route path="/todos" element={guard('/todos', <Todos />)} />
             <Route path="/outreach" element={guard('/outreach', <Outreach />)} />
             <Route path="/homedoc" element={guard('/homedoc', <HomeDoc />)} />
             <Route path="/homedoc/:id" element={guard('/homedoc', <HomeDoc />)} />

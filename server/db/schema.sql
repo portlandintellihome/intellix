@@ -173,6 +173,26 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens (user_id);
 
+CREATE TABLE IF NOT EXISTS todos (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+  client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+  ticket_id INTEGER REFERENCES support_tickets(id) ON DELETE SET NULL,
+  priority TEXT DEFAULT 'normal',
+  status TEXT DEFAULT 'open',
+  due_date DATE,
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_todos_assigned_to ON todos (assigned_to);
+CREATE INDEX IF NOT EXISTS idx_todos_status ON todos (status);
+CREATE INDEX IF NOT EXISTS idx_todos_due_date ON todos (due_date);
+
 CREATE TABLE IF NOT EXISTS composer_builds (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
