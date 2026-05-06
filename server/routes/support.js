@@ -255,17 +255,23 @@ router.post('/intake', (req, res, next) => {
         has_photo: Boolean(attachmentUrl),
       })
 
-      // 7. Fire webhook (don't block response on it).
+      // 7. Fire webhook (don't block response on it). Field names match the
+      // documented intake contract used by downstream integrations
+      // (n8n "Support intake flow", etc.) — keep them stable.
       const baseUrl = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`
-      const photoLink = attachmentUrl ? `${baseUrl}${attachmentUrl}` : null
+      const fullAttachmentUrl = attachmentUrl ? `${baseUrl}${attachmentUrl}` : null
       fireWebhook({
-        ticket_id: referenceNumber,
-        ticket_db_id: ticketDbId,
+        ticket_id: ticketDbId,                 // DB primary key (integer)
+        reference_number: referenceNumber,     // user-facing INT-XXXXXXXX
         client_id: match?.id || null,
         client_matched: clientMatched,
         matched_on: match?.matched_on || null,
-        name, email, phone, address, issue,
-        photo_url: photoLink,
+        contact_name: name,
+        contact_email: email,
+        contact_phone: phone,
+        contact_address: address,
+        description: issue,
+        attachment_url: fullAttachmentUrl,
         intake_source: intakeSource,
         submitted_at: rawPayload.submitted_at,
       }).catch(() => {})
