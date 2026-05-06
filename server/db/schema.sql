@@ -87,8 +87,12 @@ CREATE TABLE IF NOT EXISTS jobs (
   assigned TEXT[] DEFAULT '{}',
   start_date DATE,
   end_date DATE,
+  closed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Backfill for the reporting route's "jobs closed this/last month" metric.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS team_members (
   id SERIAL PRIMARY KEY,
@@ -115,8 +119,12 @@ CREATE TABLE IF NOT EXISTS support_tickets (
   assigned_to INTEGER REFERENCES team_members(id) ON DELETE SET NULL,
   job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
   notes TEXT,
+  resolved_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Backfill for the reporting route's avg-resolution-time metric.
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS inventory (
   id SERIAL PRIMARY KEY,

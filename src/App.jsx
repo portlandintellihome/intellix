@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, NavLink, useLocation, Navigate } from 're
 import {
   LayoutDashboard, Briefcase, Users, HeadphonesIcon,
   CalendarDays, Wrench, Library, Package,
-  Bot, Users2, BarChart2, Plug, Settings, LogOut, Mail, FolderOpen,
+  Bot, Users2, BarChart3, Plug, Settings, LogOut, Mail, FolderOpen,
   Menu, X
 } from 'lucide-react'
 import './index.css'
@@ -34,6 +34,7 @@ const TOKEN_KEY = 'intellix_token'
 const NAV = [
   { section: 'Main' },
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/reporting', label: 'Reporting', icon: BarChart3 },
   { path: '/jobs', label: 'Jobs & proposals', icon: Briefcase },
   { path: '/clients', label: 'Clients', icon: Users },
   { path: '/tickets', label: 'Support tickets', icon: HeadphonesIcon },
@@ -47,7 +48,6 @@ const NAV = [
   { path: '/assist', label: 'Intellix Assist', icon: Bot },
   { section: 'Admin' },
   { path: '/team', label: 'Team', icon: Users2 },
-  { path: '/reporting', label: 'Reporting', icon: BarChart2 },
   { path: '/integrations', label: 'Integrations & APIs', icon: Plug },
   { path: '/settings', label: 'Settings', icon: Settings },
 ]
