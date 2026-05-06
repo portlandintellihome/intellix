@@ -51,6 +51,20 @@ END $$;
 
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS homedoc JSONB DEFAULT '{}';
 
+CREATE TABLE IF NOT EXISTS settings (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  company_name TEXT,
+  company_address TEXT,
+  company_phone TEXT,
+  company_email TEXT,
+  company_logo_url TEXT,
+  google_review_link TEXT,
+  email_notifications BOOLEAN DEFAULT TRUE,
+  in_app_notifications BOOLEAN DEFAULT TRUE,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT settings_singleton CHECK (id = 1)
+);
+
 CREATE TABLE IF NOT EXISTS check_ins (
   id SERIAL PRIMARY KEY,
   client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,

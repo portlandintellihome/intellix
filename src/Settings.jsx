@@ -1,43 +1,10 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-
-const CHECKLIST = [
-  { id: 'company',      label: 'Add company info',              detail: 'Name, address, phone, and business hours',       done: false, path: null,              cta: 'Fill in below' },
-  { id: 'logo',         label: 'Upload company logo',           detail: 'Appears on proposals and client portals',         done: false, path: null,              cta: 'Upload' },
-  { id: 'anthropic',    label: 'Connect Anthropic API',         detail: 'Powers Intellix Assist',                           done: false, path: '/integrations',   cta: 'Connect' },
-  { id: 'ovrc',         label: 'Connect OVRC',                  detail: 'Remote monitoring of client devices',              done: false, path: '/integrations',   cta: 'Connect' },
-  { id: 'portal',       label: 'Connect Portal.io',             detail: 'Proposal sending and tracking via Zapier',         done: false, path: '/integrations',   cta: 'Connect' },
-  { id: 'team',         label: 'Add your first employee',       detail: 'Installers, programmers, and office staff',        done: false, path: '/team',           cta: 'Invite' },
-  { id: 'invite',       label: 'Invite the rest of your team',  detail: 'Send login invites so everyone can collaborate',   done: false, path: '/team',           cta: 'Invite' },
-  { id: 'client',       label: 'Add your first client',         detail: 'Start tracking jobs, proposals, and tickets',      done: false, path: '/clients',        cta: 'Add client' },
-  { id: 'proposal',     label: 'Send your first proposal',      detail: 'Portal.io connection required',                    done: false, path: '/jobs',           cta: 'New proposal' },
-]
-
-const DEFAULT_COMPANY = {
-  name: '',
-  legalName: '',
-  phone: '',
-  email: '',
-  website: '',
-  address: '',
-  timezone: 'America/Los_Angeles',
-  currency: 'USD',
-  taxRate: '0',
-  hoursStart: '08:00',
-  hoursEnd: '17:00',
-}
-
-const TIMEZONES = [
-  'America/Los_Angeles', 'America/Denver', 'America/Chicago', 'America/New_York',
-  'America/Phoenix', 'America/Anchorage', 'Pacific/Honolulu',
-]
-const CURRENCIES = ['USD', 'CAD', 'EUR', 'GBP', 'AUD']
+import { useState, useEffect } from 'react'
+import { apiGet } from './lib/api'
 
 const lbl = { fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }
 const inp = { width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 11px', fontSize: 12.5, color: 'var(--text)', fontFamily: 'var(--font)', outline: 'none' }
 const primaryBtn = { padding: '8px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#1d1d1f', color: '#fff', fontFamily: 'var(--font)' }
-const ghostBtn = { padding: '7px 14px', borderRadius: 7, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontFamily: 'var(--font)' }
-const linkBtn = { padding: '7px 14px', borderRadius: 7, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', border: 'none', background: 'rgba(0,102,204,0.08)', color: 'var(--accent)', fontFamily: 'var(--font)' }
+const ghostBtn = { padding: '8px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontFamily: 'var(--font)' }
 
 const s = {
   topbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 },
@@ -45,74 +12,41 @@ const s = {
   content: { flex: 1, overflowY: 'auto', padding: '16px 24px 24px' },
   card: { background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '18px 20px', marginBottom: 14 },
   sectionTitle: { fontSize: 10.5, color: 'var(--text2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 12 },
-  cardHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  cardHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 },
   cardHeaderTitle: { fontSize: 13.5, fontWeight: 700, color: 'var(--text)' },
   cardHeaderSub: { fontSize: 11.5, color: 'var(--text2)', marginTop: 2 },
 }
 
-function Check({ done }) {
-  if (done) {
-    return (
-      <div style={{ width: 20, height: 20, minWidth: 20, borderRadius: '50%', background: '#34c759', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-      </div>
-    )
-  }
-  return <div style={{ width: 20, height: 20, minWidth: 20, borderRadius: '50%', border: '1.5px dashed var(--border)', background: 'transparent' }} />
-}
-
-function ChecklistRow({ item, onAction, last }) {
+function Toggle({ checked, onChange, label, hint }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: last ? 'none' : '1px solid var(--border2)' }}>
-      <Check done={item.done} />
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, padding: '10px 0', borderBottom: '1px solid var(--border2)' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: item.done ? 'var(--text2)' : 'var(--text)', textDecoration: item.done ? 'line-through' : 'none' }}>{item.label}</div>
-        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{item.detail}</div>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>{label}</div>
+        {hint && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>{hint}</div>}
       </div>
-      {item.cta && !item.done && (
-        <button onClick={() => onAction(item)} style={linkBtn}>{item.cta}</button>
-      )}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        style={{
+          width: 42, height: 24, borderRadius: 12, border: 'none', padding: 0,
+          background: checked ? 'var(--accent)' : 'var(--bg4)',
+          cursor: 'pointer', position: 'relative', flexShrink: 0,
+          transition: 'background 0.15s',
+        }}
+      >
+        <span style={{
+          position: 'absolute', top: 2, left: checked ? 20 : 2,
+          width: 20, height: 20, borderRadius: '50%', background: '#fff',
+          transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+        }} />
+      </button>
     </div>
   )
 }
 
-function SetupChecklist({ items, onAction }) {
-  const done = items.filter(i => i.done).length
-  const pct = Math.round((done / items.length) * 100)
-
-  return (
-    <div style={s.card}>
-      <div style={s.cardHeader}>
-        <div>
-          <div style={s.cardHeaderTitle}>Setup checklist</div>
-          <div style={s.cardHeaderSub}>{done} of {items.length} complete</div>
-        </div>
-        <div style={{ fontSize: 22, fontWeight: 700, color: pct === 100 ? '#248a3d' : 'var(--accent)' }}>{pct}%</div>
-      </div>
-
-      <div style={{ height: 6, background: 'var(--bg4)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: pct === 100 ? '#34c759' : 'var(--accent)', transition: 'width 0.3s' }} />
-      </div>
-
-      <div>
-        {items.map((item, i) => (
-          <ChecklistRow key={item.id} item={item} onAction={onAction} last={i === items.length - 1} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function CompanyInfo() {
-  const [form, setForm] = useState(DEFAULT_COMPANY)
-  const [saved, setSaved] = useState(false)
-  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setSaved(false) }
-
-  const save = () => {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
-
+function CompanyInfo({ data, onChange }) {
   return (
     <div style={s.card}>
       <div style={s.cardHeader}>
@@ -120,133 +54,228 @@ function CompanyInfo() {
           <div style={s.cardHeaderTitle}>Company info</div>
           <div style={s.cardHeaderSub}>Appears on proposals, invoices, and client-facing pages</div>
         </div>
-        {saved && <span style={{ fontSize: 11.5, color: '#248a3d', fontWeight: 600 }}>✓ Saved</span>}
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <div style={lbl}>Company name</div>
+        <input style={inp} value={data.company_name || ''} onChange={e => onChange('company_name', e.target.value)} placeholder="e.g. Intellihome AV" />
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <div style={lbl}>Address</div>
+        <input style={inp} value={data.company_address || ''} onChange={e => onChange('company_address', e.target.value)} placeholder="Street address" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
         <div>
-          <div style={lbl}>Business name</div>
-          <input style={inp} value={form.name} onChange={e => set('name', e.target.value)} />
+          <div style={lbl}>Phone</div>
+          <input style={inp} type="tel" value={data.company_phone || ''} onChange={e => onChange('company_phone', e.target.value)} placeholder="(503) 555-0100" />
         </div>
         <div>
-          <div style={lbl}>Legal name</div>
-          <input style={inp} value={form.legalName} onChange={e => set('legalName', e.target.value)} />
+          <div style={lbl}>Email</div>
+          <input style={inp} type="email" value={data.company_email || ''} onChange={e => onChange('company_email', e.target.value)} placeholder="hello@company.com" />
+        </div>
+      </div>
+
+      <div>
+        <div style={lbl}>Company logo</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 56, height: 56, borderRadius: 10, background: 'var(--bg3)', border: '1px dashed var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+            {data.company_logo_url
+              ? <img src={data.company_logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <span style={{ fontSize: 10, color: 'var(--text3)' }}>No logo</span>}
+          </div>
+          <div style={{ flex: 1 }}>
+            <input style={{ ...inp, marginBottom: 6 }} value={data.company_logo_url || ''} onChange={e => onChange('company_logo_url', e.target.value)} placeholder="https://... (logo URL)" />
+            <button type="button" disabled style={{ ...ghostBtn, padding: '6px 12px', fontSize: 11, opacity: 0.5, cursor: 'not-allowed' }}>Upload from device — coming soon</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function GoogleBusiness({ data, onChange }) {
+  return (
+    <div style={s.card}>
+      <div style={s.cardHeader}>
+        <div>
+          <div style={s.cardHeaderTitle}>Google Business</div>
+          <div style={s.cardHeaderSub}>Sent in post-job follow-up emails to ask satisfied clients for a review</div>
+        </div>
+      </div>
+
+      <div>
+        <div style={lbl}>Google review link</div>
+        <input
+          style={{ ...inp, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12 }}
+          value={data.google_review_link || ''}
+          onChange={e => onChange('google_review_link', e.target.value)}
+          placeholder="https://g.page/r/your-place-id/review"
+        />
+        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
+          Find this in your Google Business profile under <strong>Get more reviews → Share review form</strong>.
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Notifications({ data, onChange }) {
+  return (
+    <div style={s.card}>
+      <div style={s.cardHeader}>
+        <div>
+          <div style={s.cardHeaderTitle}>Notifications</div>
+          <div style={s.cardHeaderSub}>How the team is alerted when something needs attention</div>
+        </div>
+      </div>
+      <Toggle
+        checked={Boolean(data.email_notifications)}
+        onChange={v => onChange('email_notifications', v)}
+        label="Email notifications"
+        hint="New tickets, proposal status changes, daily digests"
+      />
+      <div style={{ marginTop: 0 }}>
+        <Toggle
+          checked={Boolean(data.in_app_notifications)}
+          onChange={v => onChange('in_app_notifications', v)}
+          label="In-app notifications"
+          hint="Banner alerts inside Intellix while signed in"
+        />
+      </div>
+    </div>
+  )
+}
+
+function Account() {
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [ok, setOk] = useState('')
+
+  const submit = async () => {
+    setError(''); setOk('')
+    if (next.length < 8) { setError('New password must be at least 8 characters'); return }
+    if (next !== confirm) { setError('New passwords do not match'); return }
+    setSubmitting(true)
+    try {
+      const base = import.meta.env.VITE_API_URL || ''
+      const token = localStorage.getItem('intellix_token')
+      const res = await fetch(`${base}/api/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ current_password: current, new_password: next }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || `${res.status}`)
+      setCurrent(''); setNext(''); setConfirm('')
+      setOk('Password updated')
+      setTimeout(() => setOk(''), 2500)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const canSubmit = current && next && confirm && !submitting
+
+  return (
+    <div style={s.card}>
+      <div style={s.cardHeader}>
+        <div>
+          <div style={s.cardHeaderTitle}>Account</div>
+          <div style={s.cardHeaderSub}>Change your password</div>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
         <div>
-          <div style={lbl}>Phone</div>
-          <input style={inp} type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} />
+          <div style={lbl}>Current password</div>
+          <input style={inp} type="password" value={current} onChange={e => setCurrent(e.target.value)} autoComplete="current-password" />
         </div>
         <div>
-          <div style={lbl}>Email</div>
-          <input style={inp} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+          <div style={lbl}>New password</div>
+          <input style={inp} type="password" value={next} onChange={e => setNext(e.target.value)} autoComplete="new-password" minLength={8} />
         </div>
         <div>
-          <div style={lbl}>Website</div>
-          <input style={inp} value={form.website} onChange={e => set('website', e.target.value)} />
+          <div style={lbl}>Confirm new</div>
+          <input style={inp} type="password" value={confirm} onChange={e => setConfirm(e.target.value)} autoComplete="new-password" minLength={8} />
         </div>
       </div>
 
-      <div style={{ marginBottom: 12 }}>
-        <div style={lbl}>Business address</div>
-        <input style={inp} value={form.address} onChange={e => set('address', e.target.value)} />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-        <div>
-          <div style={lbl}>Timezone</div>
-          <select style={inp} value={form.timezone} onChange={e => set('timezone', e.target.value)}>
-            {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
-          </select>
+      {error && (
+        <div style={{ background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.25)', borderRadius: 8, padding: '8px 12px', fontSize: 11.5, color: '#d70015', fontWeight: 500, marginBottom: 12 }}>
+          {error}
         </div>
-        <div>
-          <div style={lbl}>Currency</div>
-          <select style={inp} value={form.currency} onChange={e => set('currency', e.target.value)}>
-            {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+      )}
+      {ok && (
+        <div style={{ background: 'rgba(52,199,89,0.09)', border: '1px solid rgba(52,199,89,0.25)', borderRadius: 8, padding: '8px 12px', fontSize: 11.5, color: '#248a3d', fontWeight: 600, marginBottom: 12 }}>
+          ✓ {ok}
         </div>
-        <div>
-          <div style={lbl}>Tax rate (%)</div>
-          <input style={inp} type="number" value={form.taxRate} onChange={e => set('taxRate', e.target.value)} />
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        <div>
-          <div style={lbl}>Business hours — start</div>
-          <input style={inp} type="time" value={form.hoursStart} onChange={e => set('hoursStart', e.target.value)} />
-        </div>
-        <div>
-          <div style={lbl}>Business hours — end</div>
-          <input style={inp} type="time" value={form.hoursEnd} onChange={e => set('hoursEnd', e.target.value)} />
-        </div>
-      </div>
+      )}
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button onClick={save} style={primaryBtn}>Save company info</button>
-      </div>
-    </div>
-  )
-}
-
-function IntegrationsSummary({ navigate }) {
-  const items = [
-    { name: 'Anthropic API',        connected: false },
-    { name: 'OVRC',                 connected: false },
-    { name: 'CompanyCam',           connected: false },
-    { name: 'Portal.io (Zapier)',   connected: false },
-  ]
-  const connected = items.filter(i => i.connected).length
-
-  return (
-    <div style={s.card}>
-      <div style={s.cardHeader}>
-        <div>
-          <div style={s.cardHeaderTitle}>Integrations</div>
-          <div style={s.cardHeaderSub}>{connected} of {items.length} services connected</div>
-        </div>
-        <button onClick={() => navigate('/integrations')} style={ghostBtn}>Manage integrations →</button>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-        {items.map(i => (
-          <div key={i.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: '1px solid var(--border2)', borderRadius: 8, background: 'var(--bg3)' }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: i.connected ? '#34c759' : '#aeaeb2' }} />
-            <div style={{ flex: 1, fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>{i.name}</div>
-            <div style={{ fontSize: 10.5, fontWeight: 700, color: i.connected ? '#248a3d' : 'var(--text3)' }}>
-              {i.connected ? 'Connected' : 'Not set'}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function TeamSummary({ navigate }) {
-  return (
-    <div style={s.card}>
-      <div style={s.cardHeader}>
-        <div>
-          <div style={s.cardHeaderTitle}>Team setup</div>
-          <div style={s.cardHeaderSub}>No team members added yet</div>
-        </div>
-        <button onClick={() => navigate('/team')} style={ghostBtn}>Manage team →</button>
-      </div>
-      <div style={{ textAlign: 'center', padding: '24px 0 8px' }}>
-        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>Invite your first teammate to get started.</div>
-        <button onClick={() => navigate('/team')} style={linkBtn}>Invite employee</button>
+        <button onClick={submit} disabled={!canSubmit} style={{ ...primaryBtn, opacity: canSubmit ? 1 : 0.5, cursor: canSubmit ? 'pointer' : 'not-allowed' }}>
+          {submitting ? 'Updating…' : 'Update password'}
+        </button>
       </div>
     </div>
   )
 }
 
 export default function Settings() {
-  const navigate = useNavigate()
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [savedNote, setSavedNote] = useState('')
+  const [error, setError] = useState('')
 
-  const onChecklistAction = (item) => {
-    if (item.path) navigate(item.path)
+  useEffect(() => {
+    apiGet('/api/settings')
+      .then(setData)
+      .catch(err => {
+        console.error('Failed to load settings', err)
+        // Fall back to empty defaults so the form still renders if /api/settings 500s.
+        setData({})
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const set = (k, v) => setData(d => ({ ...d, [k]: v }))
+
+  const save = async () => {
+    if (!data) return
+    setSaving(true); setError(''); setSavedNote('')
+    try {
+      const base = import.meta.env.VITE_API_URL || ''
+      const res = await fetch(`${base}/api/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      const updated = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(updated.error || `Save failed (${res.status})`)
+      setData(updated)
+      setSavedNote('Saved')
+      setTimeout(() => setSavedNote(''), 2000)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+        <div style={s.topbar}><div style={s.title}>Settings</div></div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13 }}>Loading…</div>
+      </div>
+    )
   }
 
   return (
@@ -254,23 +283,28 @@ export default function Settings() {
 
       <div style={s.topbar}>
         <div style={s.title}>Settings</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {savedNote && <span style={{ fontSize: 11.5, color: '#248a3d', fontWeight: 600 }}>✓ {savedNote}</span>}
+          {error && <span style={{ fontSize: 11.5, color: '#d70015', fontWeight: 600 }}>{error}</span>}
+          <button onClick={save} disabled={saving} style={{ ...primaryBtn, opacity: saving ? 0.6 : 1, cursor: saving ? 'wait' : 'pointer' }}>
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
       </div>
 
       <div style={s.content}>
-        <div style={{ maxWidth: 900, margin: '0 auto' }}>
-
-          <div style={s.sectionTitle}>Getting started</div>
-          <SetupChecklist items={CHECKLIST} onAction={onChecklistAction} />
-
+        <div style={{ maxWidth: 800, margin: '0 auto' }}>
           <div style={s.sectionTitle}>Company</div>
-          <CompanyInfo />
+          <CompanyInfo data={data} onChange={set} />
 
-          <div style={s.sectionTitle}>Integrations</div>
-          <IntegrationsSummary navigate={navigate} />
+          <div style={s.sectionTitle}>Reviews</div>
+          <GoogleBusiness data={data} onChange={set} />
 
-          <div style={s.sectionTitle}>Team</div>
-          <TeamSummary navigate={navigate} />
+          <div style={s.sectionTitle}>Notifications</div>
+          <Notifications data={data} onChange={set} />
 
+          <div style={s.sectionTitle}>Account</div>
+          <Account />
         </div>
       </div>
     </div>
