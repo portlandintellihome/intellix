@@ -110,9 +110,9 @@ UPDATE settings SET checkin_email_body =
   <p style="font-size: 15px; line-height: 1.6; margin: 0; color: #1d1d1f; font-weight: 600;">— The IntelliHome team</p>
 </body></html>'
   WHERE id = 1 AND checkin_email_body IS NULL;
--- Backfill new google_review_url from the legacy google_review_link if unset.
-UPDATE settings SET google_review_url = google_review_link
-  WHERE id = 1 AND google_review_url IS NULL AND google_review_link IS NOT NULL;
+-- (Previously this block backfilled settings.google_review_url from the
+-- legacy google_review_link. The column was dropped above when the review
+-- URL moved per-location, so the backfill is intentionally gone.)
 
 CREATE TABLE IF NOT EXISTS check_ins (
   id SERIAL PRIMARY KEY,
