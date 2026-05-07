@@ -18,6 +18,40 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// General PATCH for the columns the UI lets users edit. Distinct from
+// the specialized /homedoc and /plan handlers below, which keep their
+// own validation paths.
+const PATCHABLE = ['name', 'email', 'phone', 'address', 'status', 'notes', 'location_id', 'ai_opt_out']
+
+router.patch('/:id', async (req, res, next) => {
+  try {
+    const body = req.body || {}
+    const setClauses = []
+    const values = []
+    for (const key of PATCHABLE) {
+      if (key in body) {
+        let v = body[key]
+        if (key === 'location_id') v = (v === '' || v == null) ? null : (Number(v) || null)
+        else if (key === 'ai_opt_out') v = Boolean(v)
+        values.push(v)
+        setClauses.push(`${key} = $${values.length}`)
+      }
+    }
+    if (setClauses.length === 0) {
+      const { rows } = await query('SELECT * FROM clients WHERE id = $1', [req.params.id])
+      if (rows.length === 0) return res.status(404).json({ error: 'Not found' })
+      return res.json(rows[0])
+    }
+    values.push(req.params.id)
+    const { rows } = await query(
+      `UPDATE clients SET ${setClauses.join(', ')} WHERE id = $${values.length} RETURNING *`,
+      values,
+    )
+    if (rows.length === 0) return res.status(404).json({ error: 'Not found' })
+    res.json(rows[0])
+  } catch (err) { next(err) }
+})
+
 router.patch('/:id/homedoc', async (req, res, next) => {
   try {
     const { homedoc, notes } = req.body || {}

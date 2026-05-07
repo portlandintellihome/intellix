@@ -135,7 +135,7 @@ function CheckIns({ data, onChange }) {
     first_name: 'Jamie',
     full_name: 'Jamie Reyes',
     address: '742 Evergreen Terrace, Portland OR',
-    review_url: data.google_review_url || data.google_review_link || 'https://g.page/r/your-place-id/review',
+    review_url: 'https://g.page/r/your-place-id/review',
     support_url: 'https://intellix.example.com/support',
     job_name: 'Living-room theater install',
   }
@@ -148,21 +148,8 @@ function CheckIns({ data, onChange }) {
         <div>
           <div style={s.cardHeaderTitle}>Post-job check-in</div>
           <div style={s.cardHeaderSub}>
-            Sent automatically a few days after a job is marked Complete. Asks for a Google review if everything's great, offers the support form if it's not.
+            Sent automatically a few days after a job is marked Complete. Asks for a Google review if everything's great, offers the support form if it's not. The review URL comes from the job's <strong>location</strong> — manage those in the Locations section below.
           </div>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: 12 }}>
-        <div style={lbl}>Google review URL</div>
-        <input
-          style={{ ...inp, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12 }}
-          value={data.google_review_url || ''}
-          onChange={e => onChange('google_review_url', e.target.value)}
-          placeholder="https://g.page/r/your-place-id/review"
-        />
-        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
-          Substituted into <code>{`{{review_url}}`}</code>. If empty, falls back to Google review link in the section above.
         </div>
       </div>
 
@@ -221,6 +208,189 @@ function CheckIns({ data, onChange }) {
           />
         </div>
       </div>
+    </div>
+  )
+}
+
+function LocationModal({ initial, onClose, onSaved }) {
+  const isEdit = Boolean(initial?.id)
+  const [form, setForm] = useState({
+    name: initial?.name || '',
+    slug: initial?.slug || '',
+    google_review_url: initial?.google_review_url || '',
+    support_email: initial?.support_email || '',
+    support_phone: initial?.support_phone || '',
+    address: initial?.address || '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const submit = async () => {
+    setError(''); setSaving(true)
+    try {
+      const base = import.meta.env.VITE_API_URL || ''
+      const token = localStorage.getItem('intellix_token')
+      const url = isEdit ? `${base}/api/locations/${initial.id}` : `${base}/api/locations`
+      const res = await fetch(url, {
+        method: isEdit ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(form),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || `${res.status}`)
+      onSaved(data)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }} onClick={onClose}>
+      <div style={{ background: 'var(--bg2)', borderRadius: 14, padding: 22, maxWidth: 480, width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>
+          {isEdit ? 'Edit location' : 'Add location'}
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <div style={lbl}>Name</div>
+          <input style={inp} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Portland" />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={lbl}>Slug</div>
+          <input style={{ ...inp, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12 }} value={form.slug} onChange={e => set('slug', e.target.value)} placeholder="auto-generated from name if blank" />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={lbl}>Google review URL</div>
+          <input style={{ ...inp, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12 }} value={form.google_review_url} onChange={e => set('google_review_url', e.target.value)} placeholder="https://g.page/r/..." />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div>
+            <div style={lbl}>Support email</div>
+            <input style={inp} type="email" value={form.support_email} onChange={e => set('support_email', e.target.value)} placeholder="support@..." />
+          </div>
+          <div>
+            <div style={lbl}>Support phone</div>
+            <input style={inp} type="tel" value={form.support_phone} onChange={e => set('support_phone', e.target.value)} placeholder="(503) 555-0100" />
+          </div>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={lbl}>Address</div>
+          <input style={inp} value={form.address} onChange={e => set('address', e.target.value)} placeholder="Street, City, State" />
+        </div>
+
+        {error && <div style={{ background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.25)', borderRadius: 8, padding: '8px 12px', fontSize: 11.5, color: '#d70015', fontWeight: 500, marginBottom: 12 }}>{error}</div>}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button onClick={onClose} style={ghostBtn}>Cancel</button>
+          <button onClick={submit} disabled={saving || !form.name.trim()} style={{ ...primaryBtn, opacity: (saving || !form.name.trim()) ? 0.5 : 1 }}>
+            {saving ? 'Saving…' : (isEdit ? 'Save changes' : 'Add location')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Locations({ isAdmin }) {
+  const [rows, setRows] = useState(null)
+  const [error, setError] = useState('')
+  const [editing, setEditing] = useState(null) // null | 'new' | <location object>
+
+  const reload = async () => {
+    try {
+      const base = import.meta.env.VITE_API_URL || ''
+      const token = localStorage.getItem('intellix_token')
+      const res = await fetch(`${base}/api/locations`, { headers: { Authorization: `Bearer ${token}` } })
+      if (!res.ok) throw new Error(`${res.status}`)
+      setRows(await res.json())
+    } catch (err) {
+      setError(err.message)
+      setRows([])
+    }
+  }
+  useEffect(() => { reload() }, [])
+
+  const onSaved = () => { setEditing(null); reload() }
+
+  const remove = async (loc) => {
+    if (!confirm(`Delete location "${loc.name}"? This can't be undone.`)) return
+    try {
+      const base = import.meta.env.VITE_API_URL || ''
+      const token = localStorage.getItem('intellix_token')
+      const res = await fetch(`${base}/api/locations/${loc.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        if (data.references) {
+          alert(`Can't delete — ${data.references.clients} clients, ${data.references.jobs} jobs, ${data.references.proposals} proposals still reference this location.`)
+          return
+        }
+        throw new Error(data.error || `${res.status}`)
+      }
+      reload()
+    } catch (err) { alert(err.message) }
+  }
+
+  return (
+    <div style={s.card}>
+      <div style={s.cardHeader}>
+        <div>
+          <div style={s.cardHeaderTitle}>Locations</div>
+          <div style={s.cardHeaderSub}>
+            Each client, job, and proposal is tagged with a location. The location's Google review URL is used in post-job check-in emails.
+          </div>
+        </div>
+        {isAdmin && (
+          <button onClick={() => setEditing('new')} style={primaryBtn}>+ Add location</button>
+        )}
+      </div>
+
+      {error && <div style={{ fontSize: 12, color: '#d70015', marginBottom: 8 }}>{error}</div>}
+      {rows == null && <div style={{ fontSize: 12, color: 'var(--text3)' }}>Loading…</div>}
+      {rows != null && rows.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)' }}>No locations yet.</div>}
+      {rows != null && rows.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {rows.map(loc => (
+            <div key={loc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{loc.name}</span>
+                  {loc.slug && <span style={{ fontSize: 10.5, color: 'var(--text3)', fontFamily: 'ui-monospace, monospace' }}>#{loc.slug}</span>}
+                  {!loc.google_review_url && <span style={{ fontSize: 10, color: '#a85a00', background: 'rgba(255,149,0,0.12)', padding: '2px 7px', borderRadius: 999, fontWeight: 600 }}>NO REVIEW URL</span>}
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--text2)', marginTop: 3 }}>
+                  {[loc.support_email, loc.support_phone, loc.address].filter(Boolean).join(' · ') || <em style={{ color: 'var(--text3)' }}>No contact info</em>}
+                </div>
+              </div>
+              {isAdmin && (
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => setEditing(loc)} style={{ ...ghostBtn, padding: '6px 12px', fontSize: 11.5 }}>Edit</button>
+                  <button onClick={() => remove(loc)} style={{ ...ghostBtn, padding: '6px 12px', fontSize: 11.5, borderColor: 'rgba(255,59,48,0.3)', color: '#d70015' }}>Delete</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {!isAdmin && (
+        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10 }}>
+          Only admins can add or edit locations.
+        </div>
+      )}
+
+      {editing && (
+        <LocationModal
+          initial={editing === 'new' ? null : editing}
+          onClose={() => setEditing(null)}
+          onSaved={onSaved}
+        />
+      )}
     </div>
   )
 }
@@ -337,6 +507,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false)
   const [savedNote, setSavedNote] = useState('')
   const [error, setError] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     apiGet('/api/settings')
@@ -347,6 +518,16 @@ export default function Settings() {
         setData({})
       })
       .finally(() => setLoading(false))
+
+    // Fetch the current user's role to gate the Locations admin controls.
+    const base = import.meta.env.VITE_API_URL || ''
+    const token = localStorage.getItem('intellix_token')
+    if (token) {
+      fetch(`${base}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.ok ? r.json() : null)
+        .then(u => setIsAdmin(u?.role === 'Admin'))
+        .catch(() => {})
+    }
   }, [])
 
   const set = (k, v) => setData(d => ({ ...d, [k]: v }))
@@ -406,6 +587,9 @@ export default function Settings() {
 
           <div style={s.sectionTitle}>Check-ins</div>
           <CheckIns data={data} onChange={set} />
+
+          <div style={s.sectionTitle}>Locations</div>
+          <Locations isAdmin={isAdmin} />
 
           <div style={s.sectionTitle}>Notifications</div>
           <Notifications data={data} onChange={set} />

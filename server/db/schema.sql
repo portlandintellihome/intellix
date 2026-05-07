@@ -17,6 +17,26 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS initials TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Available';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT FALSE;
 
+-- Multi-location support. Each client/job/proposal belongs to one location;
+-- post-job check-ins pull google_review_url from the job's location.
+CREATE TABLE IF NOT EXISTS locations (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE,
+  google_review_url TEXT,
+  support_email TEXT,
+  support_phone TEXT,
+  address TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+-- One-shot seed: only fires if the table is still empty after creation.
+INSERT INTO locations (name, slug)
+  SELECT 'Portland', 'portland'
+  WHERE NOT EXISTS (SELECT 1 FROM locations);
+INSERT INTO locations (name, slug)
+  SELECT 'Los Angeles', 'la'
+  WHERE NOT EXISTS (SELECT 1 FROM locations WHERE slug = 'la');
+
 CREATE TABLE IF NOT EXISTS clients (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
@@ -40,6 +60,8 @@ ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_tier TEXT DEFAULT 'None';
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_start_date DATE;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_renewal_date DATE;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS ai_opt_out BOOLEAN DEFAULT FALSE;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id);
+UPDATE clients SET location_id = 1 WHERE location_id IS NULL;
 
 -- Rename intellifile -> homedoc if the old column exists (and the new
 -- one doesn't yet). Idempotent: safe to re-run.
@@ -67,8 +89,10 @@ CREATE TABLE IF NOT EXISTS settings (
   CONSTRAINT settings_singleton CHECK (id = 1)
 );
 
--- Google review check-in configuration.
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS google_review_url TEXT;
+-- Google review check-in configuration. The review URL is per-location
+-- (see locations.google_review_url), so settings only stores the global
+-- delay/subject/body template.
+ALTER TABLE settings DROP COLUMN IF EXISTS google_review_url;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS checkin_delay_days INTEGER DEFAULT 3;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS checkin_email_subject TEXT
   DEFAULT 'How''s your IntelliHome system working?';
@@ -127,6 +151,15 @@ ALTER TABLE jobs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS checkin_sent_at TIMESTAMPTZ;
 UPDATE jobs SET completed_at = COALESCE(closed_at, created_at)
   WHERE status = 'Complete' AND completed_at IS NULL;
+
+-- Multi-location: each job belongs to one location. Backfill from the
+-- linked client's location_id, falling back to id=1 (Portland).
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id);
+UPDATE jobs SET location_id = COALESCE(
+    (SELECT location_id FROM clients WHERE clients.id = jobs.client_id),
+    1
+  )
+  WHERE location_id IS NULL;
 
 CREATE TABLE IF NOT EXISTS team_members (
   id SERIAL PRIMARY KEY,
@@ -210,6 +243,12 @@ CREATE TABLE IF NOT EXISTS proposals (
   assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE proposals ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id);
+UPDATE proposals SET location_id = COALESCE(
+    (SELECT location_id FROM clients WHERE clients.id = proposals.client_id),
+    1
+  )
+  WHERE location_id IS NULL;
 
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   token TEXT PRIMARY KEY,

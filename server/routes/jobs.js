@@ -28,7 +28,45 @@ router.get('/:id', async (req, res, next) => {
 // `status` — when it transitions to 'Complete' and completed_at is still
 // NULL, we stamp completed_at = NOW() so the Google review check-in flow
 // can pick the job up at the right time.
-const PATCHABLE = ['name', 'client_id', 'address', 'phase', 'status', 'priority', 'scope', 'start_date', 'end_date']
+const PATCHABLE = ['name', 'client_id', 'address', 'phase', 'status', 'priority', 'scope', 'start_date', 'end_date', 'location_id']
+
+// POST /api/jobs — creates a job and defaults location_id from:
+//   1. body.location_id if explicitly provided
+//   2. body.proposal_id → proposals.location_id  (job created from accepted proposal)
+//   3. body.client_id → clients.location_id      (job created from existing client)
+//   4. id = 1 fallback
+router.post('/', async (req, res, next) => {
+  try {
+    const body = req.body || {}
+    if (!body.name) return res.status(400).json({ error: 'name is required' })
+
+    let locationId = body.location_id ? Number(body.location_id) : null
+    if (!locationId && body.proposal_id) {
+      const r = await query('SELECT location_id FROM proposals WHERE id = $1', [body.proposal_id])
+      locationId = r.rows[0]?.location_id || null
+    }
+    if (!locationId && body.client_id) {
+      const r = await query('SELECT location_id FROM clients WHERE id = $1', [body.client_id])
+      locationId = r.rows[0]?.location_id || null
+    }
+    if (!locationId) locationId = 1
+
+    const { rows } = await query(
+      `INSERT INTO jobs (name, client_id, address, phase, status, priority, scope,
+                         start_date, end_date, location_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *`,
+      [
+        body.name, body.client_id || null, body.address || null,
+        body.phase || null, body.status || 'Scheduled',
+        body.priority || 'Normal', body.scope || null,
+        body.start_date || null, body.end_date || null,
+        locationId,
+      ],
+    )
+    res.status(201).json(rows[0])
+  } catch (err) { next(err) }
+})
 
 router.patch('/:id', async (req, res, next) => {
   try {

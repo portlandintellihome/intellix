@@ -47,7 +47,6 @@ router.get('/due', requireInternalKey, async (_req, res, next) => {
     const settings = settingsRes.rows[0] || {}
     const delayDays = Number.isFinite(Number(settings.checkin_delay_days))
       ? Number(settings.checkin_delay_days) : 3
-    const reviewUrl = settings.google_review_url || settings.google_review_link || ''
     const subjectTpl = settings.checkin_email_subject || "How's your IntelliHome system working?"
     const bodyTpl = settings.checkin_email_body || ''
     const supportUrl = (process.env.PUBLIC_BASE_URL || '').replace(/\/+$/, '') + '/support'
@@ -57,12 +56,17 @@ router.get('/due', requireInternalKey, async (_req, res, next) => {
               j.name         AS job_name,
               j.address      AS job_address,
               j.completed_at,
+              j.location_id  AS job_location_id,
               c.id           AS client_id,
               c.name         AS client_name,
               c.email        AS client_email,
-              c.address      AS client_address
+              c.address      AS client_address,
+              loc.id         AS location_id,
+              loc.name       AS location_name,
+              loc.google_review_url AS location_review_url
          FROM jobs j
          JOIN clients c ON c.id = j.client_id
+         LEFT JOIN locations loc ON loc.id = j.location_id
         WHERE j.status = 'Complete'
           AND j.completed_at IS NOT NULL
           AND j.completed_at < NOW() - ($1::int * INTERVAL '1 day')
@@ -74,7 +78,25 @@ router.get('/due', requireInternalKey, async (_req, res, next) => {
       [delayDays],
     )
 
-    const result = rows.map(r => {
+    const skipped = []
+    const result = []
+    for (const r of rows) {
+      const reviewUrl = r.location_review_url || ''
+      if (!reviewUrl) {
+        console.warn('[checkins] skipping job', {
+          job_id: r.job_id,
+          reason: 'location has no google_review_url',
+          location_id: r.job_location_id,
+          location_name: r.location_name,
+        })
+        skipped.push({
+          job_id: r.job_id,
+          location_id: r.job_location_id,
+          location_name: r.location_name,
+          reason: 'location has no google_review_url',
+        })
+        continue
+      }
       const values = {
         first_name: firstName(r.client_name),
         full_name: r.client_name || '',
@@ -82,23 +104,28 @@ router.get('/due', requireInternalKey, async (_req, res, next) => {
         review_url: reviewUrl,
         support_url: supportUrl,
         job_name: r.job_name || '',
+        location_name: r.location_name || '',
       }
-      return {
+      result.push({
         job_id: r.job_id,
         client_id: r.client_id,
+        location_id: r.location_id,
+        location_name: r.location_name,
         client_name_first: values.first_name,
         client_email: r.client_email,
         client_address: values.address,
         completed_at: r.completed_at,
         subject: substitute(subjectTpl, values),
         html_body: substitute(bodyTpl, values),
-      }
-    })
+      })
+    }
 
     res.json({
       delay_days: delayDays,
-      configured: Boolean(reviewUrl) && Boolean(bodyTpl),
+      configured: Boolean(bodyTpl),
       count: result.length,
+      skipped_count: skipped.length,
+      skipped,
       jobs: result,
     })
   } catch (err) { next(err) }

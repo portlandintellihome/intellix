@@ -71,10 +71,34 @@ function NewClientModal({ onClose }) {
   )
 }
 
-function ClientDetail({ client, onClose }) {
+function ClientDetail({ client, onClose, locations, onLocationChanged }) {
   const [editingNotes, setEditingNotes] = useState(false)
   const [notes, setNotes] = useState(client.notes)
+  const [locationId, setLocationId] = useState(client.location_id || '')
+  const [savingLocation, setSavingLocation] = useState(false)
   const initials = client.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+
+  const updateLocation = async (newId) => {
+    setLocationId(newId)
+    setSavingLocation(true)
+    try {
+      const base = import.meta.env.VITE_API_URL || ''
+      const token = localStorage.getItem('intellix_token')
+      const res = await fetch(`${base}/api/clients/${client.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ location_id: newId ? Number(newId) : null }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        onLocationChanged?.(updated)
+      }
+    } catch (err) {
+      console.error('Failed to update client location', err)
+    } finally {
+      setSavingLocation(false)
+    }
+  }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
@@ -104,8 +128,8 @@ function ClientDetail({ client, onClose }) {
                 { label: 'Email', value: client.email, href: `mailto:${client.email}` },
                 { label: 'Phone', value: client.phone, href: `tel:${client.phone}` },
                 { label: 'Address', value: client.address, href: null },
-              ].map((f, i, arr) => (
-                <div key={f.label} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: i < arr.length - 1 ? '1px solid var(--border2)' : 'none' }}>
+              ].map((f) => (
+                <div key={f.label} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border2)' }}>
                   <div style={{ width: 70, fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>{f.label}</div>
                   {f.href
                     ? <a href={f.href} style={{ fontSize: 12.5, color: 'var(--accent)', fontWeight: 500, textDecoration: 'none' }}>{f.value}</a>
@@ -113,6 +137,21 @@ function ClientDetail({ client, onClose }) {
                   }
                 </div>
               ))}
+              <div style={{ display: 'flex', alignItems: 'center', padding: '10px 14px' }}>
+                <div style={{ width: 70, fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Location</div>
+                <select
+                  value={locationId}
+                  onChange={e => updateLocation(e.target.value)}
+                  disabled={savingLocation || !locations}
+                  style={{ ...inp, fontSize: 12.5, padding: '6px 10px', flex: 1, maxWidth: 240 }}
+                >
+                  <option value="">— Unassigned —</option>
+                  {(locations || []).map(loc => (
+                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                  ))}
+                </select>
+                {savingLocation && <span style={{ marginLeft: 10, fontSize: 11, color: 'var(--text3)' }}>Saving…</span>}
+              </div>
             </div>
           </div>
 
@@ -167,6 +206,7 @@ function ClientDetail({ client, onClose }) {
 
 export default function Clients() {
   const [clients, setClients] = useState([])
+  const [locations, setLocations] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('All')
@@ -186,7 +226,19 @@ export default function Clients() {
       }))))
       .catch(err => console.error('Failed to load clients', err))
       .finally(() => setLoading(false))
+
+    const base = import.meta.env.VITE_API_URL || ''
+    const token = localStorage.getItem('intellix_token')
+    fetch(`${base}/api/locations`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then(r => r.ok ? r.json() : [])
+      .then(setLocations)
+      .catch(() => {})
   }, [])
+
+  const onClientLocationChanged = (updated) => {
+    setClients(cs => cs.map(c => c.id === updated.id ? { ...c, location_id: updated.location_id } : c))
+    setSelected(s => s && s.id === updated.id ? { ...s, location_id: updated.location_id } : s)
+  }
 
   useEffect(() => {
     if (!loading && location.state?.openClientId) {
@@ -217,7 +269,14 @@ export default function Clients() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
       {showNew && <NewClientModal onClose={() => setShowNew(false)} />}
-      {selected && <ClientDetail client={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <ClientDetail
+          client={selected}
+          onClose={() => setSelected(null)}
+          locations={locations}
+          onLocationChanged={onClientLocationChanged}
+        />
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Clients</div>

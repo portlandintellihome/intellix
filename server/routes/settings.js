@@ -10,7 +10,6 @@ const DEFAULTS = {
   company_email: '',
   company_logo_url: '',
   google_review_link: '',
-  google_review_url: '',
   checkin_delay_days: 3,
   checkin_email_subject: "How's your IntelliHome system working?",
   checkin_email_body: '',
@@ -38,7 +37,6 @@ router.post('/', async (req, res, next) => {
       company_email: typeof body.company_email === 'string' ? body.company_email : '',
       company_logo_url: typeof body.company_logo_url === 'string' ? body.company_logo_url : '',
       google_review_link: typeof body.google_review_link === 'string' ? body.google_review_link : '',
-      google_review_url: typeof body.google_review_url === 'string' ? body.google_review_url : '',
       checkin_delay_days: Number.isFinite(delayParsed) && delayParsed >= 0 ? Math.floor(delayParsed) : 3,
       checkin_email_subject: typeof body.checkin_email_subject === 'string' ? body.checkin_email_subject : '',
       checkin_email_body: typeof body.checkin_email_body === 'string' ? body.checkin_email_body : '',
@@ -48,10 +46,10 @@ router.post('/', async (req, res, next) => {
 
     const { rows } = await query(
       `INSERT INTO settings (id, company_name, company_address, company_phone, company_email,
-                             company_logo_url, google_review_link, google_review_url,
+                             company_logo_url, google_review_link,
                              checkin_delay_days, checkin_email_subject, checkin_email_body,
                              email_notifications, in_app_notifications, updated_at)
-       VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+       VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
        ON CONFLICT (id) DO UPDATE SET
          company_name = EXCLUDED.company_name,
          company_address = EXCLUDED.company_address,
@@ -59,7 +57,6 @@ router.post('/', async (req, res, next) => {
          company_email = EXCLUDED.company_email,
          company_logo_url = EXCLUDED.company_logo_url,
          google_review_link = EXCLUDED.google_review_link,
-         google_review_url = EXCLUDED.google_review_url,
          checkin_delay_days = EXCLUDED.checkin_delay_days,
          checkin_email_subject = EXCLUDED.checkin_email_subject,
          checkin_email_body = EXCLUDED.checkin_email_body,
@@ -69,7 +66,7 @@ router.post('/', async (req, res, next) => {
        RETURNING *`,
       [
         data.company_name, data.company_address, data.company_phone, data.company_email,
-        data.company_logo_url, data.google_review_link, data.google_review_url,
+        data.company_logo_url, data.google_review_link,
         data.checkin_delay_days, data.checkin_email_subject, data.checkin_email_body,
         data.email_notifications, data.in_app_notifications,
       ]
