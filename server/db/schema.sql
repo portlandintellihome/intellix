@@ -67,6 +67,29 @@ CREATE TABLE IF NOT EXISTS settings (
   CONSTRAINT settings_singleton CHECK (id = 1)
 );
 
+-- Google review check-in configuration.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS google_review_url TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS checkin_delay_days INTEGER DEFAULT 3;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS checkin_email_subject TEXT
+  DEFAULT 'How''s your IntelliHome system working?';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS checkin_email_body TEXT;
+-- Seed default body if NULL (single-quote-escaped HTML below).
+UPDATE settings SET checkin_email_body =
+  '<!DOCTYPE html><html><body style="font-family: -apple-system, BlinkMacSystemFont, ''Segoe UI'', Helvetica, Arial, sans-serif; color: #1d1d1f; max-width: 560px; margin: 0 auto; padding: 28px;">
+  <p style="font-size: 16px; line-height: 1.55; margin: 0 0 16px;">Hi {{first_name}},</p>
+  <p style="font-size: 15px; line-height: 1.6; margin: 0 0 18px; color: #3a3a3c;">It''s been a few days since we wrapped up at {{address}} — just checking in to make sure everything is working the way you want it to.</p>
+  <p style="font-size: 15px; line-height: 1.6; margin: 0 0 14px; color: #3a3a3c;"><strong>If everything is great</strong>, would you mind leaving us a quick Google review? It takes 30 seconds and it makes a big difference for a small business.</p>
+  <p style="margin: 0 0 24px; text-align: center;"><a href="{{review_url}}" style="display: inline-block; padding: 12px 22px; background: #34c759; color: #fff; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 600;">Leave a Google review</a></p>
+  <p style="font-size: 15px; line-height: 1.6; margin: 0 0 14px; color: #3a3a3c;"><strong>If something is not quite right</strong>, please let us know and we''ll come take care of it.</p>
+  <p style="margin: 0 0 28px; text-align: center;"><a href="{{support_url}}" style="display: inline-block; padding: 12px 22px; background: #0066cc; color: #fff; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 600;">Submit a support request</a></p>
+  <p style="font-size: 15px; line-height: 1.6; margin: 0 0 4px; color: #3a3a3c;">Thanks again for choosing IntelliHome.</p>
+  <p style="font-size: 15px; line-height: 1.6; margin: 0; color: #1d1d1f; font-weight: 600;">— The IntelliHome team</p>
+</body></html>'
+  WHERE id = 1 AND checkin_email_body IS NULL;
+-- Backfill new google_review_url from the legacy google_review_link if unset.
+UPDATE settings SET google_review_url = google_review_link
+  WHERE id = 1 AND google_review_url IS NULL AND google_review_link IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS check_ins (
   id SERIAL PRIMARY KEY,
   client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
@@ -95,6 +118,15 @@ CREATE TABLE IF NOT EXISTS jobs (
 
 -- Backfill for the reporting route's "jobs closed this/last month" metric.
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ;
+
+-- Google review check-in flow: completed_at marks when the job finished
+-- (closed_at is the legacy name and is kept in sync via backfill below).
+-- checkin_sent_at marks when the post-job follow-up email went out so we
+-- never double-send.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS checkin_sent_at TIMESTAMPTZ;
+UPDATE jobs SET completed_at = COALESCE(closed_at, created_at)
+  WHERE status = 'Complete' AND completed_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS team_members (
   id SERIAL PRIMARY KEY,

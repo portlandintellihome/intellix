@@ -15,6 +15,7 @@ import driversRouter from './routes/drivers.js'
 import proposalsRouter from './routes/proposals.js'
 import composerBuildsRouter from './routes/composer-builds.js'
 import checkInsRouter from './routes/check-ins.js'
+import checkinsRouter from './routes/checkins.js'
 import assistRouter from './routes/assist.js'
 import aiRouter from './routes/ai.js'
 import settingsRouter from './routes/settings.js'
@@ -46,6 +47,7 @@ app.use('/api/drivers', driversRouter)
 app.use('/api/proposals', proposalsRouter)
 app.use('/api/composer-builds', composerBuildsRouter)
 app.use('/api/check-ins', checkInsRouter)
+app.use('/api/checkins', checkinsRouter)
 app.use('/api/assist', assistRouter)
 app.use('/api/ai', aiRouter)
 app.use('/api/settings', settingsRouter)

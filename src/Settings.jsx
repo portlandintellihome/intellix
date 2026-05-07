@@ -121,6 +121,110 @@ function GoogleBusiness({ data, onChange }) {
   )
 }
 
+// Render an HTML email body with the same {{placeholder}} substitution
+// the backend uses, so the live preview matches what'll actually go out.
+function substitute(template, values) {
+  if (!template) return ''
+  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key) =>
+    values[key] != null ? String(values[key]) : `{{${key}}}`
+  )
+}
+
+function CheckIns({ data, onChange }) {
+  const sample = {
+    first_name: 'Jamie',
+    full_name: 'Jamie Reyes',
+    address: '742 Evergreen Terrace, Portland OR',
+    review_url: data.google_review_url || data.google_review_link || 'https://g.page/r/your-place-id/review',
+    support_url: 'https://intellix.example.com/support',
+    job_name: 'Living-room theater install',
+  }
+  const previewSubject = substitute(data.checkin_email_subject || '', sample)
+  const previewHtml = substitute(data.checkin_email_body || '', sample)
+
+  return (
+    <div style={s.card}>
+      <div style={s.cardHeader}>
+        <div>
+          <div style={s.cardHeaderTitle}>Post-job check-in</div>
+          <div style={s.cardHeaderSub}>
+            Sent automatically a few days after a job is marked Complete. Asks for a Google review if everything's great, offers the support form if it's not.
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <div style={lbl}>Google review URL</div>
+        <input
+          style={{ ...inp, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12 }}
+          value={data.google_review_url || ''}
+          onChange={e => onChange('google_review_url', e.target.value)}
+          placeholder="https://g.page/r/your-place-id/review"
+        />
+        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
+          Substituted into <code>{`{{review_url}}`}</code>. If empty, falls back to Google review link in the section above.
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 12, marginBottom: 12 }}>
+        <div>
+          <div style={lbl}>Days after completion</div>
+          <input
+            style={inp}
+            type="number"
+            min={0}
+            value={Number.isFinite(Number(data.checkin_delay_days)) ? data.checkin_delay_days : 3}
+            onChange={e => onChange('checkin_delay_days', e.target.value === '' ? '' : Number(e.target.value))}
+          />
+        </div>
+        <div>
+          <div style={lbl}>Email subject</div>
+          <input
+            style={inp}
+            value={data.checkin_email_subject || ''}
+            onChange={e => onChange('checkin_email_subject', e.target.value)}
+            placeholder="How's your IntelliHome system working?"
+          />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <div style={lbl}>Email body (HTML)</div>
+        <textarea
+          rows={14}
+          style={{
+            ...inp,
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            fontSize: 12,
+            lineHeight: 1.5,
+            resize: 'vertical',
+            minHeight: 220,
+          }}
+          value={data.checkin_email_body || ''}
+          onChange={e => onChange('checkin_email_body', e.target.value)}
+        />
+        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
+          Placeholders: <code>{`{{first_name}}`}</code>, <code>{`{{full_name}}`}</code>, <code>{`{{address}}`}</code>, <code>{`{{review_url}}`}</code>, <code>{`{{support_url}}`}</code>, <code>{`{{job_name}}`}</code>.
+        </div>
+      </div>
+
+      <div>
+        <div style={{ ...lbl, marginBottom: 8 }}>Live preview</div>
+        <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
+          <div style={{ background: 'var(--bg3)', padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, color: 'var(--text2)' }}>
+            <div><strong style={{ color: 'var(--text)' }}>Subject:</strong> {previewSubject || <em style={{ color: 'var(--text3)' }}>(empty)</em>}</div>
+            <div><strong style={{ color: 'var(--text)' }}>To:</strong> {sample.first_name} ({sample.full_name})</div>
+          </div>
+          <div
+            style={{ padding: 0, color: '#1d1d1f', background: '#fff' }}
+            dangerouslySetInnerHTML={{ __html: previewHtml || '<div style="padding:24px;color:#999;font-size:13px;">(empty body)</div>' }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Notifications({ data, onChange }) {
   return (
     <div style={s.card}>
@@ -299,6 +403,9 @@ export default function Settings() {
 
           <div style={s.sectionTitle}>Reviews</div>
           <GoogleBusiness data={data} onChange={set} />
+
+          <div style={s.sectionTitle}>Check-ins</div>
+          <CheckIns data={data} onChange={set} />
 
           <div style={s.sectionTitle}>Notifications</div>
           <Notifications data={data} onChange={set} />
