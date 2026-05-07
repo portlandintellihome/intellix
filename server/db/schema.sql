@@ -129,10 +129,10 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
 
 -- Public support intake: tickets that arrive via the /support form rather
--- than the internal CRM. intake_source distinguishes them; contact_* fields
--- snapshot the form data at submit time (independent of any matched client
--- record); attachment_url points at the uploaded photo (if any); raw_payload
--- holds the full intake JSON for replay/debugging.
+-- than the internal CRM. intake_source distinguishes them. contact_*
+-- fields snapshot the form data at submit time (independent of any
+-- matched client record). attachment_url points at the uploaded photo
+-- (if any). raw_payload holds the full intake JSON for replay/debugging.
 ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS intake_source TEXT DEFAULT 'internal';
 ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS contact_name TEXT;
 ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS contact_email TEXT;

@@ -9,27 +9,69 @@ const { Pool } = pg
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SCHEMA_PATH = path.resolve(__dirname, 'schema.sql')
 
-// Split a SQL file on top-level semicolons while respecting dollar-quoted
-// blocks ($$ … $$), so DO blocks and other multi-statement bodies aren't
-// broken at internal semicolons.
+// Split a SQL file on top-level semicolons while respecting:
+//   - dollar-quoted blocks  ($$ … $$)   so DO blocks survive
+//   - single-quoted strings ('…')        so semicolons in literals survive
+//   - line comments         (-- … \n)    so semicolons in comments survive
+//   - block comments        (/* … */)    same
+//
+// The previous version only handled $$, which meant a single inline ";"
+// inside a `--` comment would shred the surrounding statement into
+// garbage fragments and Postgres would 42601 the resulting nonsense.
 function splitStatements(sql) {
   const out = []
   let buf = ''
   let inDollar = false
+  let inSingleQuote = false
+  let inLineComment = false
+  let inBlockComment = false
+
   for (let i = 0; i < sql.length; i++) {
-    if (sql[i] === '$' && sql[i + 1] === '$') {
-      inDollar = !inDollar
-      buf += '$$'
-      i++
+    const c = sql[i]
+    const next = sql[i + 1]
+
+    // Comment handling — comments are passed through to the buffer so
+    // Postgres still sees them, but their contents (including ;) are
+    // ignored by the splitter.
+    if (inLineComment) {
+      buf += c
+      if (c === '\n') inLineComment = false
       continue
     }
-    if (!inDollar && sql[i] === ';') {
+    if (inBlockComment) {
+      buf += c
+      if (c === '*' && next === '/') { buf += next; i++; inBlockComment = false }
+      continue
+    }
+    // Dollar-quoted block — ignore everything between $$ … $$ except the
+    // closing delimiter. Single quotes inside $$ blocks are literal.
+    if (inDollar) {
+      if (c === '$' && next === '$') { buf += '$$'; i++; inDollar = false; continue }
+      buf += c
+      continue
+    }
+    // Single-quoted string literal — handle '' (escaped quote) but
+    // otherwise treat as opaque.
+    if (inSingleQuote) {
+      buf += c
+      if (c === "'" && next === "'") { buf += next; i++; continue }
+      if (c === "'") inSingleQuote = false
+      continue
+    }
+
+    // Outside any quoted/commented region: detect openers.
+    if (c === '-' && next === '-') { buf += '--'; i++; inLineComment = true; continue }
+    if (c === '/' && next === '*') { buf += '/*'; i++; inBlockComment = true; continue }
+    if (c === '$' && next === '$') { buf += '$$'; i++; inDollar = true; continue }
+    if (c === "'") { buf += c; inSingleQuote = true; continue }
+
+    if (c === ';') {
       const trimmed = buf.trim()
       if (trimmed) out.push(trimmed)
       buf = ''
       continue
     }
-    buf += sql[i]
+    buf += c
   }
   const tail = buf.trim()
   if (tail) out.push(tail)
