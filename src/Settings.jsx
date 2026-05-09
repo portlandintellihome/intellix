@@ -95,32 +95,6 @@ function CompanyInfo({ data, onChange }) {
   )
 }
 
-function GoogleBusiness({ data, onChange }) {
-  return (
-    <div style={s.card}>
-      <div style={s.cardHeader}>
-        <div>
-          <div style={s.cardHeaderTitle}>Google Business</div>
-          <div style={s.cardHeaderSub}>Sent in post-job follow-up emails to ask satisfied clients for a review</div>
-        </div>
-      </div>
-
-      <div>
-        <div style={lbl}>Google review link</div>
-        <input
-          style={{ ...inp, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12 }}
-          value={data.google_review_link || ''}
-          onChange={e => onChange('google_review_link', e.target.value)}
-          placeholder="https://g.page/r/your-place-id/review"
-        />
-        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
-          Find this in your Google Business profile under <strong>Get more reviews → Share review form</strong>.
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // Render an HTML email body with the same {{placeholder}} substitution
 // the backend uses, so the live preview matches what'll actually go out.
 function substitute(template, values) {
@@ -148,7 +122,7 @@ function CheckIns({ data, onChange }) {
         <div>
           <div style={s.cardHeaderTitle}>Post-job check-in</div>
           <div style={s.cardHeaderSub}>
-            Sent automatically a few days after a job is marked Complete. Asks for a Google review if everything's great, offers the support form if it's not. The review URL comes from the job's <strong>location</strong> — manage those in the Locations section below.
+            Sent automatically a few days after a job is marked Complete. Asks for a Google review if everything's great, offers the support form if it's not. The review URL comes from the job's <strong>location</strong> — set those in the Locations section above.
           </div>
         </div>
       </div>
@@ -582,14 +556,11 @@ export default function Settings() {
           <div style={s.sectionTitle}>Company</div>
           <CompanyInfo data={data} onChange={set} />
 
-          <div style={s.sectionTitle}>Reviews</div>
-          <GoogleBusiness data={data} onChange={set} />
+          <div style={s.sectionTitle}>Locations</div>
+          <Locations isAdmin={isAdmin} />
 
           <div style={s.sectionTitle}>Check-ins</div>
           <CheckIns data={data} onChange={set} />
-
-          <div style={s.sectionTitle}>Locations</div>
-          <Locations isAdmin={isAdmin} />
 
           <div style={s.sectionTitle}>Notifications</div>
           <Notifications data={data} onChange={set} />

@@ -317,6 +317,21 @@ function ProposalModal({ initial, clients, locations, onClose, onSaved }) {
   const [error, setError] = useState('')
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
+  // Editing Labor or Materials snaps Total back to Labor+Materials.
+  // Editing Total directly is allowed and persists until L or M change again.
+  const recomputeTotal = (key, value) => {
+    const num = (v) => v === '' || v == null ? 0 : Number(v) || 0
+    setForm(f => {
+      const labor     = key === 'labor'     ? value : f.labor
+      const materials = key === 'materials' ? value : f.materials
+      return {
+        ...f,
+        [key]: value,
+        total: String(num(labor) + num(materials)),
+      }
+    })
+  }
+
   const onClientPicked = (client) => {
     if (!client) return
     if (!form.location_id) set('location_id', client.location_id || null)
@@ -387,16 +402,16 @@ function ProposalModal({ initial, clients, locations, onClose, onSaved }) {
             </div>
             <div>
               <div style={lbl}>Labor</div>
-              <input style={inp} type="number" min="0" step="0.01" value={form.labor} onChange={e => set('labor', e.target.value)} />
+              <input style={inp} type="number" min="0" step="0.01" value={form.labor} onChange={e => recomputeTotal('labor', e.target.value)} />
             </div>
             <div>
               <div style={lbl}>Materials</div>
-              <input style={inp} type="number" min="0" step="0.01" value={form.materials} onChange={e => set('materials', e.target.value)} />
+              <input style={inp} type="number" min="0" step="0.01" value={form.materials} onChange={e => recomputeTotal('materials', e.target.value)} />
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <div style={lbl}>Total</div>
+              <div style={lbl}>Total <span style={{ fontWeight: 400, color: 'var(--text3)' }}>(auto from Labor + Materials, override allowed)</span></div>
               <input style={inp} type="number" min="0" step="0.01" value={form.total} onChange={e => set('total', e.target.value)} />
             </div>
             <div>

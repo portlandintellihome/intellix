@@ -82,7 +82,6 @@ CREATE TABLE IF NOT EXISTS settings (
   company_phone TEXT,
   company_email TEXT,
   company_logo_url TEXT,
-  google_review_link TEXT,
   email_notifications BOOLEAN DEFAULT TRUE,
   in_app_notifications BOOLEAN DEFAULT TRUE,
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -93,6 +92,8 @@ CREATE TABLE IF NOT EXISTS settings (
 -- (see locations.google_review_url), so settings only stores the global
 -- delay/subject/body template.
 ALTER TABLE settings DROP COLUMN IF EXISTS google_review_url;
+-- Drop the legacy global review link too — review URLs are per-location now.
+ALTER TABLE settings DROP COLUMN IF EXISTS google_review_link;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS checkin_delay_days INTEGER DEFAULT 3;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS checkin_email_subject TEXT
   DEFAULT 'How''s your IntelliHome system working?';
