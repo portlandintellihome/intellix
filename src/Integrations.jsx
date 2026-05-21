@@ -1,185 +1,375 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
-const INTEGRATIONS = [
-  {
-    id: 'anthropic',
-    name: 'Anthropic API',
-    category: 'AI',
-    color: '#1d1d1f',
-    initials: 'AI',
-    description: 'Powers Intellix Assist — Control4 programming help, proposal drafting, and client communication.',
-    keyLabel: 'API key',
-    keyPlaceholder: 'sk-ant-...',
-    docsUrl: 'https://console.anthropic.com',
-  },
-  {
-    id: 'ovrc',
-    name: 'OVRC',
-    category: 'Remote monitoring',
-    color: '#0066cc',
-    initials: 'OV',
-    description: 'Remote monitoring and management of Snap One / SnapAV devices across all client sites.',
-    keyLabel: 'API key',
-    keyPlaceholder: 'Enter OVRC API key',
-    docsUrl: 'https://www.ovrc.com',
-  },
-  {
-    id: 'companycam',
-    name: 'CompanyCam',
-    category: 'Photo documentation',
-    color: '#ff9500',
-    initials: 'CC',
-    description: 'Sync job-site photos to client projects. Photos tagged by job appear on job and ticket pages.',
-    keyLabel: 'API token',
-    keyPlaceholder: 'ccam_...',
-    docsUrl: 'https://companycam.com/developers',
-  },
-  {
-    id: 'portal',
-    name: 'Portal.io (via Zapier)',
-    category: 'Proposal portal',
-    color: '#534AB7',
-    initials: 'PT',
-    description: 'Send and track Portal.io proposals. Accepted proposals auto-create jobs. Connected through a Zapier webhook.',
-    keyLabel: 'Zapier webhook URL',
-    keyPlaceholder: 'https://hooks.zapier.com/hooks/catch/...',
-    docsUrl: 'https://zapier.com',
-  },
-]
+const TOKEN_KEY = 'intellix_token'
+const BASE = import.meta.env.VITE_API_URL || ''
 
 const lbl = { fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }
-const inp = { width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 11px', fontSize: 12.5, color: 'var(--text)', fontFamily: 'var(--font)', outline: 'none' }
-const primaryBtn = { padding: '8px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#1d1d1f', color: '#fff', fontFamily: 'var(--font)' }
-const ghostBtn = { padding: '8px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontFamily: 'var(--font)' }
-const dangerBtn = { padding: '8px 16px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,59,48,0.3)', background: 'transparent', color: '#d70015', fontFamily: 'var(--font)' }
+const inp = { width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 11px', fontSize: 12.5, color: 'var(--text)', fontFamily: 'var(--font)', outline: 'none', boxSizing: 'border-box' }
+const primaryBtn = { padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#1d1d1f', color: '#fff', fontFamily: 'var(--font)' }
+const ghostBtn = { padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontFamily: 'var(--font)' }
+const dangerBtn = { padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,59,48,0.3)', background: 'transparent', color: '#d70015', fontFamily: 'var(--font)' }
 
-function StatusPill({ connected }) {
+function authHeaders() {
+  const t = localStorage.getItem(TOKEN_KEY)
+  return t ? { Authorization: `Bearer ${t}` } : {}
+}
+
+async function api(path, { method = 'GET', body } = {}) {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `${res.status}`)
+  return data
+}
+
+function StatusPill({ connected, label }) {
   const bg = connected ? 'rgba(52,199,89,0.09)' : 'rgba(174,174,178,0.15)'
   const color = connected ? '#248a3d' : '#6e6e73'
   const dot = connected ? '#34c759' : '#aeaeb2'
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 9px', borderRadius: 5, fontSize: 10.5, fontWeight: 700, background: bg, color }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 999, background: bg, color, fontSize: 10.5, fontWeight: 700 }}>
       <span style={{ width: 6, height: 6, borderRadius: '50%', background: dot }} />
-      {connected ? 'Connected' : 'Not connected'}
+      {label || (connected ? 'Connected' : 'Not connected')}
     </span>
   )
 }
 
-function mask(key) {
-  if (!key) return ''
-  if (key.length <= 8) return '•'.repeat(key.length)
-  return key.slice(0, 4) + '•'.repeat(Math.max(8, key.length - 8)) + key.slice(-4)
+function relativeTime(iso) {
+  if (!iso) return 'Never'
+  const ms = Date.now() - new Date(iso).getTime()
+  if (ms < 60_000) return 'just now'
+  if (ms < 3600_000) return `${Math.floor(ms / 60_000)} min ago`
+  if (ms < 86400_000) return `${Math.floor(ms / 3600_000)} hr ago`
+  return `${Math.floor(ms / 86400_000)} days ago`
 }
 
-function IntegrationCard({ integration, state, onConnect, onDisconnect }) {
-  const { connected, key, savedKey } = state
-  const [reveal, setReveal] = useState(false)
-
-  const canConnect = key.trim().length > 0
-  const displayValue = connected && !reveal ? mask(savedKey) : key
-
+function CopyField({ value, label }) {
+  const [copied, setCopied] = useState(false)
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {}
+  }
   return (
-    <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-        <div style={{ width: 42, height: 42, minWidth: 42, borderRadius: 10, background: integration.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' }}>
-          {integration.initials}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{integration.name}</div>
-            <StatusPill connected={connected} />
-          </div>
-          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{integration.category}</div>
-        </div>
-      </div>
-
-      <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>{integration.description}</div>
-
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-          <div style={lbl}>{integration.keyLabel}</div>
-          {connected && (
-            <button onClick={() => setReveal(r => !r)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 10.5, fontWeight: 600, color: 'var(--accent)', padding: 0, fontFamily: 'var(--font)' }}>
-              {reveal ? 'Hide' : 'Reveal'}
-            </button>
-          )}
-        </div>
+    <div>
+      {label && <div style={lbl}>{label}</div>}
+      <div style={{ display: 'flex', gap: 6 }}>
         <input
-          type={connected && !reveal ? 'text' : 'password'}
-          style={{ ...inp, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11.5 }}
-          placeholder={integration.keyPlaceholder}
-          value={displayValue}
-          readOnly={connected && !reveal}
-          onChange={e => onConnect.setKey(e.target.value)}
+          readOnly
+          value={value}
+          style={{ ...inp, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11.5, background: 'var(--bg)' }}
+          onFocus={e => e.target.select()}
         />
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4 }}>
-        <a href={integration.docsUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
-          Docs
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </a>
-        {connected
-          ? <button onClick={onDisconnect} style={dangerBtn}>Disconnect</button>
-          : <button onClick={onConnect.submit} disabled={!canConnect} style={{ ...primaryBtn, opacity: canConnect ? 1 : 0.5, cursor: canConnect ? 'pointer' : 'not-allowed' }}>Connect</button>}
+        <button onClick={onCopy} style={{ ...ghostBtn, minWidth: 70 }}>{copied ? 'Copied' : 'Copy'}</button>
       </div>
     </div>
   )
 }
 
-export default function Integrations() {
-  const [state, setState] = useState(() =>
-    INTEGRATIONS.reduce((acc, i) => {
-      acc[i.id] = { connected: false, key: '', savedKey: '' }
-      return acc
-    }, {})
-  )
+// --- Portal.io card ---------------------------------------------------------
 
-  const update = (id, patch) => setState(s => ({ ...s, [id]: { ...s[id], ...patch } }))
-  const setKey = (id) => (value) => update(id, { key: value })
-  const connect = (id) => () => {
-    const key = state[id].key.trim()
-    if (!key) return
-    update(id, { connected: true, savedKey: key, key: '' })
+function PortalIoCard({ integration, locations, onChanged }) {
+  const [defaultLocId, setDefaultLocId] = useState(integration.default_location_id || '')
+  const [savingLoc, setSavingLoc] = useState(false)
+  const [testResult, setTestResult] = useState(null)
+  const [testing, setTesting] = useState(false)
+  const [showRegenConfirm, setShowRegenConfirm] = useState(false)
+  const [revealedSecret, setRevealedSecret] = useState(null)
+  const [connecting, setConnecting] = useState(false)
+
+  // The site's own origin is the right base — works on staging, prod, local.
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const secretForUrl = revealedSecret || (integration.secret_set ? `…${integration.secret_last4}` : '<not-set>')
+  const proposalUrl = `${origin}/api/webhooks/portal-io/proposal/${secretForUrl}`
+  const contactUrl  = `${origin}/api/webhooks/portal-io/contact/${secretForUrl}`
+
+  const saveLocation = async (newId) => {
+    setDefaultLocId(newId)
+    setSavingLoc(true)
+    try {
+      await api(`/api/integrations/portal_io`, {
+        method: 'PATCH',
+        body: { default_location_id: newId ? Number(newId) : null },
+      })
+      onChanged()
+    } catch (err) {
+      setTestResult({ ok: false, message: err.message })
+    } finally {
+      setSavingLoc(false)
+    }
   }
-  const disconnect = (id) => () => update(id, { connected: false, key: '', savedKey: '' })
 
-  const connectedCount = Object.values(state).filter(s => s.connected).length
+  const toggleConnected = async () => {
+    setConnecting(true)
+    try {
+      const next = !integration.connected
+      await api(`/api/integrations/portal_io`, {
+        method: 'PATCH',
+        body: { connected: next },
+      })
+      onChanged()
+    } catch (err) {
+      setTestResult({ ok: false, message: err.message })
+    } finally {
+      setConnecting(false)
+    }
+  }
+
+  const regenerate = async () => {
+    setShowRegenConfirm(false)
+    try {
+      const result = await api(`/api/integrations/portal_io`, {
+        method: 'PATCH',
+        body: { regenerate_secret: true },
+      })
+      setRevealedSecret(result.full_secret)
+      onChanged()
+    } catch (err) {
+      setTestResult({ ok: false, message: err.message })
+    }
+  }
+
+  const runTest = async () => {
+    setTesting(true); setTestResult(null)
+    try {
+      const r = await api(`/api/integrations/portal_io/test`, { method: 'POST' })
+      setTestResult({ ok: true, message: r.message, detail: r.result })
+      onChanged()
+    } catch (err) {
+      setTestResult({ ok: false, message: err.message })
+    } finally {
+      setTesting(false)
+    }
+  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+    <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: 20, marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+          <div style={{ width: 44, height: 44, borderRadius: 10, background: '#534AB7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>PT</div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Portal.io</div>
+              <span style={{ fontSize: 10.5, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>via Zapier</span>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, maxWidth: 540 }}>
+              Two-way sync: proposal status changes and contact updates in Portal flow into Intellix via Zapier webhooks. Accepted proposals auto-create jobs.
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <StatusPill connected={integration.connected} />
+        </div>
+      </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Integrations & APIs</div>
-          <div style={{ fontSize: 11.5, color: 'var(--text2)' }}>
-            {connectedCount} of {INTEGRATIONS.length} connected
+      <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 10 }}>
+        Last synced: <strong style={{ color: 'var(--text)' }}>{relativeTime(integration.last_synced_at)}</strong>
+      </div>
+
+      <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: 14, marginBottom: 14 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
+          Paste these into your Zapier "Webhooks by Zapier → POST" actions
+        </div>
+        {!revealedSecret && integration.secret_set && (
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.5 }}>
+            The full secret is hidden — the URLs above show only the last 4 characters (<code>…{integration.secret_last4}</code>). If you lost the original URLs, regenerate the secret below to reveal new ones (this <strong>invalidates the current Zapier configuration</strong>).
+          </div>
+        )}
+        {revealedSecret && (
+          <div style={{ background: 'rgba(255,149,0,0.08)', border: '1px solid rgba(255,149,0,0.25)', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#a85a00', marginBottom: 10 }}>
+            Copy these URLs now — the secret is only shown once. Refreshing this page will hide it.
+          </div>
+        )}
+        <div style={{ marginBottom: 10 }}>
+          <CopyField label="Proposal sync URL" value={proposalUrl} />
+        </div>
+        <div>
+          <CopyField label="Contact sync URL" value={contactUrl} />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+        <div>
+          <div style={lbl}>Default location for Portal.io syncs</div>
+          <select
+            style={inp}
+            value={defaultLocId || ''}
+            onChange={e => saveLocation(e.target.value)}
+            disabled={savingLoc}
+          >
+            <option value="">— Unassigned —</option>
+            {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+          </select>
+          <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
+            Used when an incoming contact doesn't match an existing client.
+          </div>
+        </div>
+        <div>
+          <div style={lbl}>Actions</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={runTest} disabled={testing} style={{ ...ghostBtn, opacity: testing ? 0.6 : 1 }}>
+              {testing ? 'Testing…' : 'Test webhook'}
+            </button>
+            <button onClick={() => setShowRegenConfirm(true)} style={dangerBtn}>Regenerate secret</button>
+            <button onClick={toggleConnected} disabled={connecting} style={integration.connected ? ghostBtn : primaryBtn}>
+              {connecting ? '…' : (integration.connected ? 'Disconnect' : 'Connect')}
+            </button>
           </div>
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px 24px' }}>
-
-        <div style={{ background: 'rgba(0,102,204,0.04)', border: '1px solid rgba(0,102,204,0.15)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-          <span style={{ fontSize: 11.5, color: 'var(--text2)', lineHeight: 1.5 }}>
-            Keys are stored locally in this session only. In production, connect your workspace to route secrets through the server.
-          </span>
+      {testResult && (
+        <div style={{ background: testResult.ok ? 'rgba(52,199,89,0.08)' : 'rgba(255,59,48,0.08)', border: `1px solid ${testResult.ok ? 'rgba(52,199,89,0.25)' : 'rgba(255,59,48,0.25)'}`, borderRadius: 8, padding: '10px 12px', fontSize: 12, color: testResult.ok ? '#248a3d' : '#d70015', lineHeight: 1.5 }}>
+          <strong>{testResult.ok ? '✓ Test fired' : '✗ Test failed'}:</strong> {testResult.message}
+          {testResult.detail && (
+            <div style={{ marginTop: 6, fontSize: 11, fontFamily: 'ui-monospace, monospace', color: 'var(--text2)' }}>
+              {JSON.stringify(testResult.detail)}
+            </div>
+          )}
         </div>
+      )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 }}>
-          {INTEGRATIONS.map(integration => (
-            <IntegrationCard
-              key={integration.id}
-              integration={integration}
-              state={state[integration.id]}
-              onConnect={{ setKey: setKey(integration.id), submit: connect(integration.id) }}
-              onDisconnect={disconnect(integration.id)}
-            />
-          ))}
+      {showRegenConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }} onClick={() => setShowRegenConfirm(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg2)', borderRadius: 12, padding: 22, maxWidth: 440 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Regenerate Portal.io secret?</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text2)', lineHeight: 1.55, marginBottom: 16 }}>
+              The current webhook URLs in your Zapier configuration will <strong>stop working immediately</strong>. You'll need to copy the new URLs into Zapier's webhook actions.
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button onClick={() => setShowRegenConfirm(false)} style={ghostBtn}>Cancel</button>
+              <button onClick={regenerate} style={dangerBtn}>Regenerate</button>
+            </div>
+          </div>
         </div>
+      )}
+    </div>
+  )
+}
 
+// --- Static cards for the other integrations -------------------------------
+
+function StaticIntegrationCard({ initials, color, name, category, description, status }) {
+  return (
+    <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: 20, marginBottom: 14, opacity: 0.85 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 10, background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{initials}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{name}</div>
+              <span style={{ fontSize: 10.5, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>{category}</span>
+            </div>
+            {status}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>{description}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// --- main page --------------------------------------------------------------
+
+export default function Integrations() {
+  const [integrations, setIntegrations] = useState(null)
+  const [locations, setLocations] = useState([])
+  const [error, setError] = useState('')
+  const [authStatus, setAuthStatus] = useState({ checked: false, isAdmin: false })
+
+  const reload = async () => {
+    try {
+      const [ints, locs] = await Promise.all([
+        api('/api/integrations'),
+        api('/api/locations'),
+      ])
+      setIntegrations(ints)
+      setLocations(locs)
+      setError('')
+    } catch (err) {
+      setError(err.message)
+      setIntegrations([])
+    }
+  }
+
+  useEffect(() => {
+    // Check role first so we can show a clear message if non-admin.
+    fetch(`${BASE}/api/auth/me`, { headers: authHeaders() })
+      .then(r => r.ok ? r.json() : null)
+      .then(u => {
+        const isAdmin = u?.role === 'Admin'
+        setAuthStatus({ checked: true, isAdmin })
+        if (isAdmin) reload()
+      })
+      .catch(() => setAuthStatus({ checked: true, isAdmin: false }))
+  }, [])
+
+  const portal = (integrations || []).find(i => i.kind === 'portal_io')
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Integrations & APIs</div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 32px' }}>
+        <div style={{ maxWidth: 860, margin: '0 auto' }}>
+          {!authStatus.checked && (
+            <div style={{ color: 'var(--text3)', fontSize: 13 }}>Loading…</div>
+          )}
+          {authStatus.checked && !authStatus.isAdmin && (
+            <div style={{ background: 'rgba(255,149,0,0.08)', border: '1px solid rgba(255,149,0,0.25)', borderRadius: 10, padding: '14px 16px', fontSize: 13, color: '#a85a00' }}>
+              Integrations management is admin-only.
+            </div>
+          )}
+          {authStatus.isAdmin && integrations == null && !error && (
+            <div style={{ color: 'var(--text3)', fontSize: 13 }}>Loading integrations…</div>
+          )}
+          {authStatus.isAdmin && error && (
+            <div style={{ background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.25)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#d70015', marginBottom: 14 }}>
+              {error} <button onClick={reload} style={{ background: 'none', border: 'none', color: '#d70015', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'var(--font)' }}>Retry</button>
+            </div>
+          )}
+
+          {authStatus.isAdmin && integrations != null && (
+            <>
+              <div style={{ fontSize: 10.5, color: 'var(--text2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 10 }}>Wired integrations</div>
+              {portal && <PortalIoCard integration={portal} locations={locations} onChanged={reload} />}
+
+              <div style={{ fontSize: 10.5, color: 'var(--text2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginTop: 18, marginBottom: 10 }}>Other</div>
+
+              <StaticIntegrationCard
+                initials="AI"
+                color="#1d1d1f"
+                name="Anthropic API"
+                category="AI"
+                description="Powers Intellix Assist. The API key is managed server-side via the ANTHROPIC_API_KEY environment variable on the backend host — there's no key field to configure here."
+                status={<StatusPill connected={true} label="Managed via env" />}
+              />
+              <StaticIntegrationCard
+                initials="OV"
+                color="#0066cc"
+                name="OVRC"
+                category="Remote monitoring"
+                description="Remote monitoring and management of Snap One / SnapAV devices across all client sites. API integration not yet wired."
+                status={<StatusPill connected={false} label="Not connected" />}
+              />
+              <StaticIntegrationCard
+                initials="CC"
+                color="#ff9500"
+                name="CompanyCam"
+                category="Photo documentation"
+                description="Sync job-site photos to client projects. Photos tagged by job appear on job and ticket pages. API integration not yet wired."
+                status={<StatusPill connected={false} label="Not connected" />}
+              />
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

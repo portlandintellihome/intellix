@@ -37,6 +37,28 @@ INSERT INTO locations (name, slug)
   SELECT 'Los Angeles', 'la'
   WHERE NOT EXISTS (SELECT 1 FROM locations WHERE slug = 'la');
 
+-- External integrations: each row is one tool (Portal.io, OVRC, etc).
+-- secret is the URL-path token webhooks must include to prove they're
+-- legitimate. default_location_id is applied to clients that come in
+-- without enough info to match an existing one.
+CREATE TABLE IF NOT EXISTS integrations (
+  id SERIAL PRIMARY KEY,
+  kind TEXT NOT NULL UNIQUE,
+  connected BOOLEAN DEFAULT FALSE,
+  secret TEXT,
+  default_location_id INTEGER REFERENCES locations(id),
+  last_synced_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+-- Seed the portal_io integration if missing. md5(random()::text || clock_timestamp()::text)
+-- gives exactly 32 hex chars — enough randomness for a webhook secret.
+INSERT INTO integrations (kind, connected, secret, default_location_id)
+  SELECT 'portal_io',
+         FALSE,
+         md5(random()::text || clock_timestamp()::text),
+         (SELECT id FROM locations WHERE name = 'Los Angeles' LIMIT 1)
+  WHERE NOT EXISTS (SELECT 1 FROM integrations WHERE kind = 'portal_io');
+
 CREATE TABLE IF NOT EXISTS clients (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
@@ -62,6 +84,10 @@ ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_renewal_date DATE;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS ai_opt_out BOOLEAN DEFAULT FALSE;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id);
 UPDATE clients SET location_id = 1 WHERE location_id IS NULL;
+-- Portal.io contact id, populated by the webhook receiver. Indexed for the
+-- lookup that runs on every incoming sync.
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS portal_contact_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_clients_portal_contact_id ON clients (portal_contact_id);
 
 -- Rename intellifile -> homedoc if the old column exists (and the new
 -- one doesn't yet). Idempotent: safe to re-run.
@@ -250,6 +276,15 @@ UPDATE proposals SET location_id = COALESCE(
     1
   )
   WHERE location_id IS NULL;
+-- Portal.io proposal id, populated by the webhook receiver. Indexed for upsert.
+ALTER TABLE proposals ADD COLUMN IF NOT EXISTS portal_proposal_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_proposals_portal_proposal_id ON proposals (portal_proposal_id);
+
+-- Link jobs back to the proposal they came from. The accepted-proposal
+-- webhook handler uses this to avoid creating duplicate jobs when the
+-- same accepted-status event fires more than once.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS proposal_id INTEGER REFERENCES proposals(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_jobs_proposal_id ON jobs (proposal_id);
 
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   token TEXT PRIMARY KEY,
