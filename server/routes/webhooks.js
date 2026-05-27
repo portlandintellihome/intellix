@@ -26,6 +26,27 @@ function mapStatus(portalStatus) {
   return STATUS_MAP[String(portalStatus || '').toLowerCase()] || 'Draft'
 }
 
+// Zapier's "Webhooks by Zapier → POST" sometimes ships dot-notation keys
+// (e.g. `"client.name": "X"`) instead of nesting them, even with Unflatten
+// turned on. Reshape the body before handler logic runs so both formats
+// behave identically. Mutates `body` in place and returns it.
+function unflattenClientKeys(body) {
+  if (!body || typeof body !== 'object') return body
+  if (body.client && typeof body.client === 'object') return body
+  const prefix = 'client.'
+  const nested = {}
+  let found = false
+  for (const key of Object.keys(body)) {
+    if (key.startsWith(prefix)) {
+      nested[key.slice(prefix.length)] = body[key]
+      delete body[key]
+      found = true
+    }
+  }
+  if (found) body.client = nested
+  return body
+}
+
 async function findOrCreateClient(client, defaultLocationId, queryFn) {
   const q = queryFn || query
   if (!client || typeof client !== 'object') {
@@ -94,6 +115,7 @@ async function touchSync(kind, queryFn) {
 
 export async function handleProposalSync(body, integration, queryFn) {
   const q = queryFn || query
+  unflattenClientKeys(body)
   const {
     portal_proposal_id,
     status,
@@ -191,6 +213,7 @@ export async function handleProposalSync(body, integration, queryFn) {
 
 export async function handleContactSync(body, integration, queryFn) {
   const q = queryFn || query
+  unflattenClientKeys(body)
   const { portal_contact_id, name, email, phone, address } = body || {}
   if (!portal_contact_id && !email) {
     throw Object.assign(

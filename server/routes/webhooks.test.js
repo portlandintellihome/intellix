@@ -207,6 +207,54 @@ test('proposal sync: second accepted hit → no duplicate job', async () => {
   assert.equal(second.action, 'updated')
 })
 
+test('proposal sync: Zapier dot-notation payload is unflattened and behaves like nested', async () => {
+  const dbA = makeFakeDb()
+  const dbB = makeFakeDb()
+  const integ = makeIntegration()
+
+  // Nested payload (the documented format)
+  const nested = await handleProposalSync({
+    portal_proposal_id: 'PORTAL-FLAT',
+    status: 'sent',
+    name: 'Theater install',
+    value: 9999, labor: 4000, materials: 5999,
+    client: {
+      portal_contact_id: 'CT-FLAT',
+      name: 'Erica Fletcher',
+      email: 'erica@example.com',
+      phone: '5035550199',
+      address: '500 Elm',
+    },
+  }, integ, dbA.query)
+
+  // Same payload but in Zapier's dot-notation shape (what Unflatten=Yes
+  // sometimes still emits). NO `client` key at all.
+  const flat = await handleProposalSync({
+    portal_proposal_id: 'PORTAL-FLAT',
+    status: 'sent',
+    name: 'Theater install',
+    value: 9999, labor: 4000, materials: 5999,
+    'client.portal_contact_id': 'CT-FLAT',
+    'client.name': 'Erica Fletcher',
+    'client.email': 'erica@example.com',
+    'client.phone': '5035550199',
+    'client.address': '500 Elm',
+  }, integ, dbB.query)
+
+  assert.equal(flat.action, nested.action)
+  assert.equal(dbB.tables.clients.length, 1)
+  assert.equal(dbB.tables.clients[0].name, 'Erica Fletcher')
+  assert.equal(dbB.tables.clients[0].email, 'erica@example.com')
+  assert.equal(dbB.tables.clients[0].portal_contact_id, 'CT-FLAT')
+  assert.equal(dbB.tables.proposals.length, 1)
+  assert.equal(dbB.tables.proposals[0].portal_proposal_id, 'PORTAL-FLAT')
+  // Sanity: dotted keys produce the same end-state as nested keys
+  assert.deepEqual(
+    { name: dbA.tables.clients[0].name, email: dbA.tables.clients[0].email, portal_contact_id: dbA.tables.clients[0].portal_contact_id },
+    { name: dbB.tables.clients[0].name, email: dbB.tables.clients[0].email, portal_contact_id: dbB.tables.clients[0].portal_contact_id },
+  )
+})
+
 test('proposal sync: client matched by email when no portal_contact_id supplied', async () => {
   const db = makeFakeDb()
   const integ = makeIntegration()
