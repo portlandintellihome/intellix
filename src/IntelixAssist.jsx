@@ -35,6 +35,17 @@ export default function IntelixAssist() {
     scrollToBottom()
   }, [messages])
 
+  // Auto-grow the textarea from 1 line up to ~5 lines (120px), then let it
+  // scroll internally. Runs on every input change so it also shrinks back to
+  // one line when the field is cleared after sending. (box-sizing:border-box
+  // from the global reset keeps this from runaway-growing.)
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+  }, [input])
+
   // Native keyboard handling. resize:'native' shrinks the WebView so the
   // input rises above the keyboard on its own — no manual padding needed
   // (adding it double-counts and over-lifts the input). We keep a

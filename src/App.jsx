@@ -304,7 +304,7 @@ function AppShell({ user, dark, setDark, logout }) {
       </aside>
 
       {/* Main content */}
-      <main style={{
+      <main className="app-main" style={{
         flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',
         minWidth: 0, minHeight: 0,
         paddingBottom: isMobile ? 'calc(56px + env(safe-area-inset-bottom))' : 0,
@@ -378,15 +378,23 @@ function AppShell({ user, dark, setDark, logout }) {
         </nav>
       )}
 
-      {/* Slide the mobile tab bar down off-screen while the iOS keyboard is up
-          (the keyboard-visible class is toggled by the Assist keyboard
-          listeners). translateY(100%) clears its full height incl. safe-area. */}
+      {/* While the iOS keyboard is up (keyboard-visible toggled by the Assist
+          listeners): slide the fixed tab bar off-screen AND drop the bottom
+          padding <main> reserves for it — otherwise that reserved ~56px leaves
+          a gap between the input and the keyboard top. !important is needed to
+          beat the inline paddingBottom. */}
       <style>{`
         .mobile-tab-bar {
           transition: transform 0.2s ease;
         }
         body.keyboard-visible .mobile-tab-bar {
           transform: translateY(100%);
+        }
+        .app-main {
+          transition: padding-bottom 0.2s ease;
+        }
+        body.keyboard-visible .app-main {
+          padding-bottom: 0 !important;
         }
       `}</style>
     </div>
