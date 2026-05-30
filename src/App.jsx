@@ -127,10 +127,6 @@ function AppShell({ user, dark, setDark, logout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
 
-  // Assist on mobile takes over the full screen (like a native chat app):
-  // no bottom nav, no reserved padding. Keyboard rises naturally into the
-  // collapsed viewport instead of fighting with a fixed nav bar.
-  const assistFullScreen = isMobile && location.pathname === '/assist'
   const nav = visibleNav(user.role)
   const bottomNav = BOTTOM_NAV.filter(item => canAccess(user.role, item.path))
   const guard = (path, element) => canAccess(user.role, path) ? element : <Navigate to="/" replace />
@@ -309,8 +305,9 @@ function AppShell({ user, dark, setDark, logout }) {
 
       {/* Main content */}
       <main style={{
-        flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0,
-        paddingBottom: (isMobile && !assistFullScreen) ? 'calc(56px + env(safe-area-inset-bottom))' : 0,
+        flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        minWidth: 0, minHeight: 0,
+        paddingBottom: isMobile ? 'calc(56px + env(safe-area-inset-bottom))' : 0,
       }}>
         <Suspense fallback={
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13, fontFamily: 'var(--font)' }}>Loading…</div>
@@ -339,9 +336,10 @@ function AppShell({ user, dark, setDark, logout }) {
         </Suspense>
       </main>
 
-      {/* Mobile bottom nav — hidden on /assist so the chat UI owns the full
-          screen (no bar floating between the input and the keyboard on iOS). */}
-      {isMobile && !assistFullScreen && (
+      {/* Mobile bottom nav — shown on every mobile page. On native iOS the
+          keyboard resizes the body (resize:'body'), so this fixed bar rides
+          up above the keyboard rather than overlapping the input. */}
+      {isMobile && (
         <nav style={{
           position: 'fixed',
           bottom: 0,
@@ -412,7 +410,7 @@ export default function App() {
   }
 
   return (
-    <div className={dark ? 'dark' : ''}>
+    <div className={dark ? 'dark' : ''} style={{ height: '100%' }}>
       <BrowserRouter>
         <AppRouter
           user={user}

@@ -104,7 +104,7 @@ export default function IntelixAssist() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
 
       {/* TOPBAR */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
@@ -127,7 +127,7 @@ export default function IntelixAssist() {
       )}
 
       {/* MESSAGES */}
-      <div style={{ flex: 1, overflowY: 'scroll', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '20px 24px' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'scroll', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '20px 24px' }}>
         <div style={{ maxWidth: 760, margin: '0 auto' }}>
 
           {messages.map((msg, i) => <Message key={i} msg={msg} />)}
@@ -146,11 +146,11 @@ export default function IntelixAssist() {
         </div>
       </div>
 
-      {/* INPUT — on mobile the send button becomes a large primary touch
-          target and the input area lifts above the iPhone home indicator. */}
+      {/* INPUT — pinned to the bottom of the Assist area, directly above the
+          mobile tab bar (which owns the home-indicator safe area). On mobile
+          the send button is a large primary touch target. */}
       <div style={{
         padding: isMobile ? '12px 14px' : '14px 24px',
-        paddingBottom: isMobile ? 'max(12px, env(safe-area-inset-bottom))' : 14,
         background: 'var(--bg2)', borderTop: '1px solid var(--border2)', flexShrink: 0,
       }}>
         <div style={{ maxWidth: 760, margin: '0 auto' }}>
