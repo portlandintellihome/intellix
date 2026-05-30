@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Briefcase, Users, HeadphonesIcon,
   CalendarDays, Wrench, Library, Package,
   Bot, Users2, BarChart3, Plug, Settings, LogOut, Mail, FolderOpen,
-  Menu, X, CheckSquare
+  Menu, X, CheckSquare, ListChecks
 } from 'lucide-react'
 import './index.css'
 import Login from './Login'
@@ -89,7 +89,7 @@ function visibleNav(role) {
 const BOTTOM_NAV = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { path: '/jobs', label: 'Jobs', icon: Briefcase },
-  { path: '/composer', label: 'Composer', icon: Wrench },
+  { path: '/todos', label: 'To-dos', icon: ListChecks },
   { path: '/calendar', label: 'Calendar', icon: CalendarDays },
   { path: '/assist', label: 'Assist', icon: Bot },
 ]

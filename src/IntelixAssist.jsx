@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { useIsMobile } from './lib/useIsMobile'
 
 const GREETING = "Hi — I'm Intellix Assist. I can help with Control4 programming, Composer Pro, proposals, client communication, and anything else your team needs. What can I help you with today?"
 
@@ -18,6 +20,7 @@ function Message({ msg }) {
 }
 
 export default function IntelixAssist() {
+  const isMobile = useIsMobile()
   const [messages, setMessages] = useState([{ role: 'assistant', content: GREETING }])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -25,9 +28,28 @@ export default function IntelixAssist() {
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
 
+  const scrollToBottom = (behavior = 'smooth') =>
+    bottomRef.current?.scrollIntoView({ behavior })
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    scrollToBottom()
   }, [messages])
+
+  // Native keyboard: when it rises, keep the latest message + input in view.
+  // Guarded so the web build (no native bridge) never touches the plugin.
+  useEffect(() => {
+    const isNative = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform?.()
+    if (!isNative) return
+    let showHandle, hideHandle
+    import('@capacitor/keyboard').then(async ({ Keyboard }) => {
+      showHandle = await Keyboard.addListener('keyboardWillShow', () => scrollToBottom())
+      hideHandle = await Keyboard.addListener('keyboardWillHide', () => scrollToBottom())
+    })
+    return () => {
+      showHandle?.remove?.()
+      hideHandle?.remove?.()
+    }
+  }, [])
 
   useEffect(() => {
     const base = import.meta.env.VITE_API_URL || ''
@@ -124,10 +146,15 @@ export default function IntelixAssist() {
         </div>
       </div>
 
-      {/* INPUT */}
-      <div style={{ padding: '14px 24px', background: 'var(--bg2)', borderTop: '1px solid var(--border2)', flexShrink: 0 }}>
+      {/* INPUT — on mobile the send button becomes a large primary touch
+          target and the input area lifts above the iPhone home indicator. */}
+      <div style={{
+        padding: isMobile ? '12px 14px' : '14px 24px',
+        paddingBottom: isMobile ? 'max(12px, env(safe-area-inset-bottom))' : 14,
+        background: 'var(--bg2)', borderTop: '1px solid var(--border2)', flexShrink: 0,
+      }}>
         <div style={{ maxWidth: 760, margin: '0 auto' }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: '8px 8px 8px 14px' }}>
+          <div style={{ display: 'flex', gap: isMobile ? 8 : 10, alignItems: 'flex-end', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: isMobile ? '6px 6px 6px 12px' : '8px 8px 8px 14px' }}>
             <textarea
               ref={inputRef}
               value={input}
@@ -135,17 +162,29 @@ export default function IntelixAssist() {
               onKeyDown={handleKey}
               placeholder="Ask anything about Control4, Composer Pro, jobs, proposals..."
               rows={1}
-              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', resize: 'none', fontSize: 13, color: 'var(--text)', fontFamily: 'var(--font)', lineHeight: 1.5, maxHeight: 120, overflowY: 'auto' }}
+              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', resize: 'none', fontSize: isMobile ? 16 : 13, color: 'var(--text)', fontFamily: 'var(--font)', lineHeight: 1.5, maxHeight: 120, overflowY: 'auto' }}
             />
             <button
               onClick={() => send()}
               disabled={!input.trim() || loading}
-              style={{ width: 34, height: 34, borderRadius: 8, border: 'none', background: input.trim() && !loading ? '#1d1d1f' : 'var(--bg4)', color: input.trim() && !loading ? '#fff' : 'var(--text3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: input.trim() && !loading ? 'pointer' : 'not-allowed', flexShrink: 0, transition: 'all 0.15s' }}
+              aria-label="Send message"
+              style={{
+                width: isMobile ? 48 : 34, height: isMobile ? 44 : 34,
+                borderRadius: isMobile ? 10 : 8, border: 'none',
+                background: input.trim() && !loading ? 'var(--accent)' : 'var(--bg4)',
+                color: input.trim() && !loading ? '#fff' : 'var(--text3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
+                flexShrink: 0, transition: 'all 0.15s',
+              }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              <svg width={isMobile ? 18 : 14} height={isMobile ? 18 : 14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
           </div>
-          <div style={{ fontSize: 10.5, color: 'var(--text3)', textAlign: 'center', marginTop: 8 }}>Press Enter to send · Shift + Enter for new line</div>
+          {/* Enter-to-send is a desktop convention; hide it on mobile. */}
+          {!isMobile && (
+            <div style={{ fontSize: 10.5, color: 'var(--text3)', textAlign: 'center', marginTop: 8 }}>Press Enter to send · Shift + Enter for new line</div>
+          )}
         </div>
       </div>
 

@@ -20,6 +20,7 @@
     "@anthropic-ai/sdk": "^0.90.0",
     "@capacitor/core": "^8.3.4",
     "@capacitor/ios": "^8.3.4",
+    "@capacitor/keyboard": "^8.0.3",
     "@fontsource/montserrat": "^5.2.8",
     "axios": "^1.15.0",
     "bcrypt": "^6.0.0",
