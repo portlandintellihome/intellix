@@ -435,6 +435,110 @@ function ProposalModal({ initial, clients, locations, onClose, onSaved }) {
   )
 }
 
+// --- JobPhotos — thumbnail grid + capture + lightbox for one job's photos
+function JobPhotos({ jobId }) {
+  const [photos, setPhotos] = useState([])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [lightbox, setLightbox] = useState(null) // photo row or null
+
+  const srcOf = (p) => `${BASE}${p.file_path}`
+
+  const load = async () => {
+    try {
+      const rows = await api(`/api/jobs/${jobId}/photos`)
+      setPhotos(Array.isArray(rows) ? rows : [])
+    } catch {
+      // Non-fatal: just show an empty grid if the list can't be fetched.
+      setPhotos([])
+    }
+  }
+
+  useEffect(() => { load() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [jobId])
+
+  const add = async () => {
+    setError('')
+    const captured = await capturePhoto()
+    if (!captured?.dataUrl) return
+    const blob = dataUrlToBlob(captured.dataUrl)
+    if (blob.size > 10 * 1024 * 1024) { setError('Photo must be 10 MB or smaller.'); return }
+    const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
+    const fd = new FormData()
+    fd.append('photo', blob, `photo.${ext}`)
+    setBusy(true)
+    try {
+      const token = getToken()
+      const res = await fetch(`${BASE}/api/jobs/${jobId}/photos`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd,
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || `Upload failed (${res.status})`)
+      }
+      const row = await res.json()
+      setPhotos(p => [row, ...p])
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async (photo) => {
+    if (!window.confirm('Delete this photo?')) return
+    try {
+      await api(`/api/jobs/${jobId}/photos/${photo.id}`, { method: 'DELETE' })
+      setPhotos(p => p.filter(x => x.id !== photo.id))
+      setLightbox(lb => (lb?.id === photo.id ? null : lb))
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Photos</div>
+        <button onClick={e => { e.stopPropagation(); add() }} disabled={busy} style={{ ...ghostBtn, fontSize: 11, opacity: busy ? 0.6 : 1, cursor: busy ? 'wait' : 'pointer' }}>
+          {busy ? 'Uploading…' : '+ Add Photo'}
+        </button>
+      </div>
+      {error && <div style={{ fontSize: 10.5, color: '#d70015', marginBottom: 6 }}>{error}</div>}
+      {photos.length === 0 ? (
+        <div style={{ fontSize: 11, color: 'var(--text3)' }}>No photos yet.</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 6 }}>
+          {photos.map(p => (
+            <div key={p.id} style={{ position: 'relative', paddingTop: '100%', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border2)' }}>
+              <img
+                src={srcOf(p)}
+                alt="Job photo"
+                onClick={e => { e.stopPropagation(); setLightbox(p) }}
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+              />
+              <button
+                onClick={e => { e.stopPropagation(); remove(p) }}
+                aria-label="Delete photo"
+                style={{ position: 'absolute', top: 3, right: 3, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 12, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >×</button>
+            </div>
+          ))}
+        </div>
+      )}
+      {lightbox && (
+        <div
+          onClick={e => { e.stopPropagation(); setLightbox(null) }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}
+        >
+          <img src={srcOf(lightbox)} alt="Job photo" style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 8 }} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function JobsProposals() {
   const [jobs, setJobs] = useState([])
   const [proposals, setProposals] = useState([])
