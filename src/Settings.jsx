@@ -205,7 +205,7 @@ function LocationModal({ initial, onClose, onSaved }) {
     setError(''); setSaving(true)
     try {
       const base = import.meta.env.VITE_API_URL || ''
-      const token = localStorage.getItem('intellix_token')
+      const token = getToken()
       const url = isEdit ? `${base}/api/locations/${initial.id}` : `${base}/api/locations`
       const res = await fetch(url, {
         method: isEdit ? 'PATCH' : 'POST',
@@ -277,7 +277,7 @@ function Locations({ isAdmin }) {
   const reload = async () => {
     try {
       const base = import.meta.env.VITE_API_URL || ''
-      const token = localStorage.getItem('intellix_token')
+      const token = getToken()
       const res = await fetch(`${base}/api/locations`, { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) throw new Error(`${res.status}`)
       setRows(await res.json())
@@ -294,7 +294,7 @@ function Locations({ isAdmin }) {
     if (!confirm(`Delete location "${loc.name}"? This can't be undone.`)) return
     try {
       const base = import.meta.env.VITE_API_URL || ''
-      const token = localStorage.getItem('intellix_token')
+      const token = getToken()
       const res = await fetch(`${base}/api/locations/${loc.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
@@ -411,7 +411,7 @@ function Account() {
     setSubmitting(true)
     try {
       const base = import.meta.env.VITE_API_URL || ''
-      const token = localStorage.getItem('intellix_token')
+      const token = getToken()
       const res = await fetch(`${base}/api/auth/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -495,7 +495,7 @@ export default function Settings() {
 
     // Fetch the current user's role to gate the Locations admin controls.
     const base = import.meta.env.VITE_API_URL || ''
-    const token = localStorage.getItem('intellix_token')
+    const token = getToken()
     if (token) {
       fetch(`${base}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.ok ? r.json() : null)

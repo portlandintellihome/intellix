@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { colorForInitials, initialsOf } from './lib/color'
+import { getToken } from './lib/auth'
 
 const TOKEN_KEY = 'intellix_token'
 const PRIORITIES = [
@@ -28,7 +29,7 @@ const ghostBtn = { padding: '7px 12px', borderRadius: 7, fontSize: 11.5, fontWei
 const BASE = import.meta.env.VITE_API_URL || ''
 
 function authedFetch(path, init = {}) {
-  const token = localStorage.getItem(TOKEN_KEY)
+  const token = getToken()
   return fetch(`${BASE}${path}`, {
     ...init,
     headers: {

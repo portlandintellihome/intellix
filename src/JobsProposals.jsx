@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { apiGet } from './lib/api'
 import { colorForInitials } from './lib/color'
+import { getToken } from './lib/auth'
 
 const TOKEN_KEY = 'intellix_token'
 const BASE = import.meta.env.VITE_API_URL || ''
@@ -23,7 +24,7 @@ const statusStyle = {
 }
 
 function authHeaders() {
-  const token = localStorage.getItem(TOKEN_KEY)
+  const token = getToken()
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 

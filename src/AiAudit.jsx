@@ -70,7 +70,7 @@ export default function AiAudit() {
     setLoading(true)
     setErr(null)
     try {
-      const token = localStorage.getItem(TOKEN_KEY)
+      const token = getToken()
       const res = await fetch(`${BASE}/api/ai/audit?${queryString}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })

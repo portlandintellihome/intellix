@@ -13,6 +13,7 @@ import ForgotPassword from './ForgotPassword'
 import ResetPassword from './ResetPassword'
 import Support from './Support'
 import { useIsMobile } from './lib/useIsMobile'
+import { initToken, getToken, authHeader, clearToken } from './lib/auth'
 
 const Dashboard = lazy(() => import('./Dashboard'))
 const JobsProposals = lazy(() => import('./JobsProposals'))
@@ -31,8 +32,6 @@ const Outreach = lazy(() => import('./Outreach'))
 const HomeDoc = lazy(() => import('./HomeDoc'))
 const Todos = lazy(() => import('./Todos'))
 const AiAudit = lazy(() => import('./AiAudit'))
-
-const TOKEN_KEY = 'intellix_token'
 
 const NAV = [
   { section: 'Main' },
@@ -407,16 +406,20 @@ export default function App() {
   const [authChecking, setAuthChecking] = useState(true)
 
   useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY)
-    if (!token) { setAuthChecking(false); return }
-    const base = import.meta.env.VITE_API_URL || ''
-    fetch(`${base}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(async res => {
-        if (!res.ok) throw new Error('invalid')
-        setUser(await res.json())
-      })
-      .catch(() => localStorage.removeItem(TOKEN_KEY))
-      .finally(() => setAuthChecking(false))
+    // Hydrate the token (and run the one-time localStorage→Preferences
+    // migration on native) before validating the session.
+    initToken().then(() => {
+      const token = getToken()
+      if (!token) { setAuthChecking(false); return }
+      const base = import.meta.env.VITE_API_URL || ''
+      fetch(`${base}/api/auth/me`, { headers: authHeader() })
+        .then(async res => {
+          if (!res.ok) throw new Error('invalid')
+          setUser(await res.json())
+        })
+        .catch(() => clearToken())
+        .finally(() => setAuthChecking(false))
+    })
   }, [])
 
   // Keep html element in sync with the in-app theme toggle so html/body
@@ -426,7 +429,7 @@ export default function App() {
   }, [dark])
 
   const logout = () => {
-    localStorage.removeItem(TOKEN_KEY)
+    clearToken()
     setUser(null)
   }
 

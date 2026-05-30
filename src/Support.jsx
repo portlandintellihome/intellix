@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
+import { capturePhoto, dataUrlToBlob } from './lib/photo'
 
 const BASE = import.meta.env.VITE_API_URL || ''
 const MAX_BYTES = 5 * 1024 * 1024
@@ -190,7 +191,7 @@ export default function Support() {
       fd.append('address', form.address.trim())
       fd.append('issue', form.issue.trim())
       fd.append('website', form.website) // honeypot — should be empty
-      if (photo) fd.append('photo', photo)
+      if (photo) fd.append('photo', photo, photoName || 'photo.jpg')
 
       const res = await fetch(`${BASE}/api/support/intake`, { method: 'POST', body: fd })
       const data = await res.json().catch(() => ({}))
@@ -330,7 +331,7 @@ export default function Support() {
                 {photoPreview
                   ? <img src={photoPreview} alt="Selected photo" style={s.thumb} />
                   : <div style={{ ...s.thumb, background: '#e5e5ea', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#8e8e93' }}>HEIC</div>}
-                <div style={s.fileName}>{photo.name}</div>
+                <div style={s.fileName}>{photoName}</div>
                 <button type="button" onClick={clearPhoto} style={s.fileRemove}>Remove</button>
               </div>
             )}

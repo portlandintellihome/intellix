@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { setToken } from './lib/auth'
 import { Link } from 'react-router-dom'
 
 const lbl = { fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }
@@ -39,7 +40,7 @@ export default function Login({ onLogin }) {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Something went wrong')
-      localStorage.setItem('intellix_token', data.token)
+      await setToken(data.token)
       onLogin(data.user)
     } catch (err) {
       setError(err.message)

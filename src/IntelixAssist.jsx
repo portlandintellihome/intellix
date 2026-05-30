@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { useIsMobile } from './lib/useIsMobile'
+import { getToken } from './lib/auth'
 
 const GREETING = "Hi — I'm Intellix Assist. I can help with Control4 programming, Composer Pro, proposals, client communication, and anything else your team needs. What can I help you with today?"
 
@@ -93,7 +94,7 @@ export default function IntelixAssist() {
 
     try {
       const base = import.meta.env.VITE_API_URL || ''
-      const token = localStorage.getItem('intellix_token')
+      const token = getToken()
       const res = await fetch(`${base}/api/assist`, {
         method: 'POST',
         headers: {
