@@ -35,33 +35,31 @@ export default function IntelixAssist() {
     scrollToBottom()
   }, [messages])
 
-  // Native keyboard handling. resize:'native' shrinks the WebView, but as a
-  // belt-and-suspenders we also publish the keyboard height as a CSS var and
-  // a body class so .assist-root can pad its bottom — covers the cases where
-  // native resize misbehaves and the input would otherwise hide behind the
-  // keyboard. Guarded so the web build (no native bridge) never touches it.
+  // Native keyboard handling. resize:'native' shrinks the WebView so the
+  // input rises above the keyboard on its own — no manual padding needed
+  // (adding it double-counts and over-lifts the input). We keep a
+  // body.keyboard-visible class for any future keyboard-reactive CSS, and
+  // scroll the latest message back into view. Guarded so the web build (no
+  // native bridge) never touches it.
   useEffect(() => {
     const isNative = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform?.()
     if (!isNative) return
     let showHandle, hideHandle
     import('@capacitor/keyboard').then(async ({ Keyboard }) => {
-      showHandle = await Keyboard.addListener('keyboardWillShow', (info) => {
+      showHandle = await Keyboard.addListener('keyboardWillShow', () => {
         document.body.classList.add('keyboard-visible')
-        document.documentElement.style.setProperty('--keyboard-height', `${info.keyboardHeight}px`)
         scrollToBottom()
       })
       hideHandle = await Keyboard.addListener('keyboardWillHide', () => {
         document.body.classList.remove('keyboard-visible')
-        document.documentElement.style.setProperty('--keyboard-height', '0px')
         scrollToBottom()
       })
     })
     return () => {
       showHandle?.remove?.()
       hideHandle?.remove?.()
-      // Leave no residual offset/class if we unmount while the keyboard is up.
+      // Leave no residual class if we unmount while the keyboard is up.
       document.body.classList.remove('keyboard-visible')
-      document.documentElement.style.setProperty('--keyboard-height', '0px')
     }
   }, [])
 
@@ -206,13 +204,6 @@ export default function IntelixAssist() {
         @keyframes bounce {
           0%, 100% { transform: translateY(0); opacity: 0.4; }
           50% { transform: translateY(-4px); opacity: 1; }
-        }
-        /* Safety net for the iOS keyboard: pad the chat by the keyboard height
-           published from the keyboardWillShow/Hide listeners above. No-op on
-           web/desktop, where --keyboard-height stays unset (falls back to 0). */
-        .assist-root {
-          padding-bottom: var(--keyboard-height, 0px);
-          transition: padding-bottom 0.2s ease;
         }
       `}</style>
     </div>
