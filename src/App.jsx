@@ -336,11 +336,12 @@ function AppShell({ user, dark, setDark, logout }) {
         </Suspense>
       </main>
 
-      {/* Mobile bottom nav — shown on every mobile page. On native iOS the
-          keyboard resizes the body (resize:'body'), so this fixed bar rides
-          up above the keyboard rather than overlapping the input. */}
+      {/* Mobile bottom nav — shown on every mobile page. When the iOS keyboard
+          rises, body.keyboard-visible slides this bar off-screen (see the
+          <style> block below) so the input sits directly above the keyboard.
+          The class only exists in the mobile branch, so desktop is unaffected. */}
       {isMobile && (
-        <nav style={{
+        <nav className="mobile-tab-bar" style={{
           position: 'fixed',
           bottom: 0,
           left: 0,
@@ -376,6 +377,18 @@ function AppShell({ user, dark, setDark, logout }) {
           })}
         </nav>
       )}
+
+      {/* Slide the mobile tab bar down off-screen while the iOS keyboard is up
+          (the keyboard-visible class is toggled by the Assist keyboard
+          listeners). translateY(100%) clears its full height incl. safe-area. */}
+      <style>{`
+        .mobile-tab-bar {
+          transition: transform 0.2s ease;
+        }
+        body.keyboard-visible .mobile-tab-bar {
+          transform: translateY(100%);
+        }
+      `}</style>
     </div>
   )
 }
