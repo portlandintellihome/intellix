@@ -35,19 +35,33 @@ export default function IntelixAssist() {
     scrollToBottom()
   }, [messages])
 
-  // Native keyboard: when it rises, keep the latest message + input in view.
-  // Guarded so the web build (no native bridge) never touches the plugin.
+  // Native keyboard handling. resize:'native' shrinks the WebView, but as a
+  // belt-and-suspenders we also publish the keyboard height as a CSS var and
+  // a body class so .assist-root can pad its bottom — covers the cases where
+  // native resize misbehaves and the input would otherwise hide behind the
+  // keyboard. Guarded so the web build (no native bridge) never touches it.
   useEffect(() => {
     const isNative = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform?.()
     if (!isNative) return
     let showHandle, hideHandle
     import('@capacitor/keyboard').then(async ({ Keyboard }) => {
-      showHandle = await Keyboard.addListener('keyboardWillShow', () => scrollToBottom())
-      hideHandle = await Keyboard.addListener('keyboardWillHide', () => scrollToBottom())
+      showHandle = await Keyboard.addListener('keyboardWillShow', (info) => {
+        document.body.classList.add('keyboard-visible')
+        document.documentElement.style.setProperty('--keyboard-height', `${info.keyboardHeight}px`)
+        scrollToBottom()
+      })
+      hideHandle = await Keyboard.addListener('keyboardWillHide', () => {
+        document.body.classList.remove('keyboard-visible')
+        document.documentElement.style.setProperty('--keyboard-height', '0px')
+        scrollToBottom()
+      })
     })
     return () => {
       showHandle?.remove?.()
       hideHandle?.remove?.()
+      // Leave no residual offset/class if we unmount while the keyboard is up.
+      document.body.classList.remove('keyboard-visible')
+      document.documentElement.style.setProperty('--keyboard-height', '0px')
     }
   }, [])
 
@@ -104,7 +118,7 @@ export default function IntelixAssist() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
+    <div className="assist-root" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
 
       {/* TOPBAR */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
@@ -192,6 +206,13 @@ export default function IntelixAssist() {
         @keyframes bounce {
           0%, 100% { transform: translateY(0); opacity: 0.4; }
           50% { transform: translateY(-4px); opacity: 1; }
+        }
+        /* Safety net for the iOS keyboard: pad the chat by the keyboard height
+           published from the keyboardWillShow/Hide listeners above. No-op on
+           web/desktop, where --keyboard-height stays unset (falls back to 0). */
+        .assist-root {
+          padding-bottom: var(--keyboard-height, 0px);
+          transition: padding-bottom 0.2s ease;
         }
       `}</style>
     </div>
