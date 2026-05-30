@@ -7,7 +7,7 @@ import crypto from 'node:crypto'
 import { Router } from 'express'
 
 import { query } from '../db.js'
-import { requireAuth, requireAdmin } from '../middleware/auth.js'
+import { requireAuth } from '../middleware/auth.js'
 import { handleProposalSync, handleContactSync } from './webhooks.js'
 
 const router = Router()
@@ -27,14 +27,14 @@ function publicShape(row) {
   }
 }
 
-router.get('/', requireAuth, requireAdmin, async (_req, res, next) => {
+router.get('/', requireAuth, async (_req, res, next) => {
   try {
     const { rows } = await query('SELECT * FROM integrations ORDER BY kind ASC')
     res.json(rows.map(publicShape))
   } catch (err) { next(err) }
 })
 
-router.patch('/:kind', requireAuth, requireAdmin, async (req, res, next) => {
+router.patch('/:kind', requireAuth, async (req, res, next) => {
   try {
     const body = req.body || {}
     const existing = await query('SELECT * FROM integrations WHERE kind = $1', [req.params.kind])
@@ -83,7 +83,7 @@ router.patch('/:kind', requireAuth, requireAdmin, async (req, res, next) => {
 // the integration is wired correctly without touching Zapier. Uses a fixed
 // portal_contact_id/portal_proposal_id so subsequent test runs reuse the
 // same test client/proposal (UPDATE, no duplication).
-router.post('/:kind/test', requireAuth, requireAdmin, async (req, res, next) => {
+router.post('/:kind/test', requireAuth, async (req, res, next) => {
   try {
     if (req.params.kind !== 'portal_io') {
       return res.status(400).json({ error: 'Test only implemented for portal_io' })

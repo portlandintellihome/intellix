@@ -280,7 +280,6 @@ export default function Integrations() {
   const [integrations, setIntegrations] = useState(null)
   const [locations, setLocations] = useState([])
   const [error, setError] = useState('')
-  const [authStatus, setAuthStatus] = useState({ checked: false, isAdmin: false })
 
   const reload = async () => {
     try {
@@ -297,17 +296,7 @@ export default function Integrations() {
     }
   }
 
-  useEffect(() => {
-    // Check role first so we can show a clear message if non-admin.
-    fetch(`${BASE}/api/auth/me`, { headers: authHeaders() })
-      .then(r => r.ok ? r.json() : null)
-      .then(u => {
-        const isAdmin = u?.role === 'Admin'
-        setAuthStatus({ checked: true, isAdmin })
-        if (isAdmin) reload()
-      })
-      .catch(() => setAuthStatus({ checked: true, isAdmin: false }))
-  }, [])
+  useEffect(() => { reload() }, [])
 
   const portal = (integrations || []).find(i => i.kind === 'portal_io')
 
@@ -319,24 +308,16 @@ export default function Integrations() {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 32px' }}>
         <div style={{ maxWidth: 860, margin: '0 auto' }}>
-          {!authStatus.checked && (
-            <div style={{ color: 'var(--text3)', fontSize: 13 }}>Loading…</div>
-          )}
-          {authStatus.checked && !authStatus.isAdmin && (
-            <div style={{ background: 'rgba(255,149,0,0.08)', border: '1px solid rgba(255,149,0,0.25)', borderRadius: 10, padding: '14px 16px', fontSize: 13, color: '#a85a00' }}>
-              Integrations management is admin-only.
-            </div>
-          )}
-          {authStatus.isAdmin && integrations == null && !error && (
+          {integrations == null && !error && (
             <div style={{ color: 'var(--text3)', fontSize: 13 }}>Loading integrations…</div>
           )}
-          {authStatus.isAdmin && error && (
+          {error && (
             <div style={{ background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.25)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#d70015', marginBottom: 14 }}>
               {error} <button onClick={reload} style={{ background: 'none', border: 'none', color: '#d70015', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'var(--font)' }}>Retry</button>
             </div>
           )}
 
-          {authStatus.isAdmin && integrations != null && (
+          {integrations != null && (
             <>
               <div style={{ fontSize: 10.5, color: 'var(--text2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 10 }}>Wired integrations</div>
               {portal && <PortalIoCard integration={portal} locations={locations} onChanged={reload} />}

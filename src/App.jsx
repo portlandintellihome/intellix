@@ -63,8 +63,8 @@ const NAV = [
 // rely on the freshly-fetched role from the server.
 const ROLE_ACCESS = {
   Admin: '*',
-  Programmer: new Set(['/', '/jobs', '/composer', '/drivers', '/homedoc', '/assist', '/todos']),
-  Technician: new Set(['/', '/jobs', '/tickets', '/calendar', '/composer', '/todos']),
+  Programmer: new Set(['/', '/jobs', '/composer', '/drivers', '/homedoc', '/assist', '/todos', '/integrations']),
+  Technician: new Set(['/', '/jobs', '/tickets', '/calendar', '/composer', '/todos', '/integrations']),
 }
 
 function canAccess(role, path) {
