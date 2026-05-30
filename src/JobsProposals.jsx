@@ -444,17 +444,16 @@ function JobPhotos({ jobId }) {
 
   const srcOf = (p) => `${BASE}${p.file_path}`
 
-  const load = async () => {
-    try {
-      const rows = await api(`/api/jobs/${jobId}/photos`)
-      setPhotos(Array.isArray(rows) ? rows : [])
-    } catch {
-      // Non-fatal: just show an empty grid if the list can't be fetched.
-      setPhotos([])
-    }
-  }
-
-  useEffect(() => { load() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [jobId])
+  // Load this job's photos whenever the panel mounts / the job changes.
+  // Inlined (rather than a separate load() function) so the effect has no
+  // function dependency and stays exhaustive-deps clean.
+  useEffect(() => {
+    let alive = true
+    api(`/api/jobs/${jobId}/photos`)
+      .then(rows => { if (alive) setPhotos(Array.isArray(rows) ? rows : []) })
+      .catch(() => { if (alive) setPhotos([]) }) // non-fatal: show empty grid
+    return () => { alive = false }
+  }, [jobId])
 
   const add = async () => {
     setError('')
