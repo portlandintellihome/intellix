@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getToken } from './lib/auth'
 
 const lbl = { fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }
 const inp = { width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 13px', fontSize: 13, color: 'var(--text)', fontFamily: 'var(--font)', outline: 'none' }
@@ -19,7 +20,7 @@ export default function ChangePassword({ user, onDone, onLogout }) {
     setSubmitting(true)
     try {
       const base = import.meta.env.VITE_API_URL || ''
-      const token = localStorage.getItem('intellix_token')
+      const token = getToken()
       const res = await fetch(`${base}/api/auth/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

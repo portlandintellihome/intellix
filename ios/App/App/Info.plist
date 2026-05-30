@@ -47,5 +47,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Intellix uses the camera to attach photos to support tickets, jobsite documentation, and equipment records.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Intellix uses your photo library to attach existing photos to support tickets and job documentation.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Intellix can save documentation photos to your photo library.</string>
 </dict>
 </plist>

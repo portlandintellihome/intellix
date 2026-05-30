@@ -3,7 +3,6 @@ import { apiGet } from './lib/api'
 import { colorForInitials } from './lib/color'
 import { getToken } from './lib/auth'
 
-const TOKEN_KEY = 'intellix_token'
 const BASE = import.meta.env.VITE_API_URL || ''
 
 const lbl = { fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }

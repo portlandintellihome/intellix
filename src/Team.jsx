@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { apiGet } from './lib/api'
 import { colorForInitials, initialsOf } from './lib/color'
+import { getToken } from './lib/auth'
 
 const statusStyle = {
   'On site':   { bg: 'rgba(52,199,89,0.09)',  color: '#248a3d', dot: '#34c759' },
@@ -116,7 +117,7 @@ function AddTeamMemberModal({ onClose, onAdded }) {
     setError('')
     try {
       const base = import.meta.env.VITE_API_URL || ''
-      const token = localStorage.getItem('intellix_token')
+      const token = getToken()
       const res = await fetch(`${base}/api/auth/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -224,7 +225,7 @@ export default function Team() {
     setResetError('')
     try {
       const base = import.meta.env.VITE_API_URL || ''
-      const token = localStorage.getItem('intellix_token')
+      const token = getToken()
       const res = await fetch(`${base}/api/auth/admin-reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

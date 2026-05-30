@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { apiGet } from './lib/api'
+import { getToken } from './lib/auth'
 
 const lbl = { fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }
 const inp = { width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 11px', fontSize: 12.5, color: 'var(--text)', fontFamily: 'var(--font)', outline: 'none' }

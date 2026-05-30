@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
+import { getToken } from './lib/auth'
 
-const TOKEN_KEY = 'intellix_token'
 const BASE = import.meta.env.VITE_API_URL || ''
 
 const STATUS_COLOR = {

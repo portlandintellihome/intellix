@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { apiGet } from './lib/api'
+import { getToken } from './lib/auth'
 
 const tagColors = {
   VIP: { bg: 'rgba(83,74,183,0.1)', color: '#534AB7' },
@@ -83,7 +84,7 @@ function ClientDetail({ client, onClose, locations, onLocationChanged }) {
     setSavingLocation(true)
     try {
       const base = import.meta.env.VITE_API_URL || ''
-      const token = localStorage.getItem('intellix_token')
+      const token = getToken()
       const res = await fetch(`${base}/api/clients/${client.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -228,7 +229,7 @@ export default function Clients() {
       .finally(() => setLoading(false))
 
     const base = import.meta.env.VITE_API_URL || ''
-    const token = localStorage.getItem('intellix_token')
+    const token = getToken()
     fetch(`${base}/api/locations`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then(r => r.ok ? r.json() : [])
       .then(setLocations)

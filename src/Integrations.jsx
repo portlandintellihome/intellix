@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
+import { getToken } from './lib/auth'
 
-const TOKEN_KEY = 'intellix_token'
 const BASE = import.meta.env.VITE_API_URL || ''
 
 const lbl = { fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }
@@ -10,7 +10,7 @@ const ghostBtn = { padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeigh
 const dangerBtn = { padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,59,48,0.3)', background: 'transparent', color: '#d70015', fontFamily: 'var(--font)' }
 
 function authHeaders() {
-  const t = localStorage.getItem(TOKEN_KEY)
+  const t = getToken()
   return t ? { Authorization: `Bearer ${t}` } : {}
 }
 
