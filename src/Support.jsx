@@ -3,7 +3,6 @@ import { capturePhoto, dataUrlToBlob } from './lib/photo'
 
 const BASE = import.meta.env.VITE_API_URL || ''
 const MAX_BYTES = 5 * 1024 * 1024
-const ACCEPTED_EXT = ['.jpg', '.jpeg', '.png', '.heic', '.heif']
 
 const FONT = '"Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif'
 
@@ -130,45 +129,38 @@ function CheckIcon() {
 export default function Support() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', address: '', issue: '', website: '' })
   const [photo, setPhoto] = useState(null)
+  const [photoName, setPhotoName] = useState('')
   const [photoPreview, setPhotoPreview] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState(null)
   const [success, setSuccess] = useState(null)
-  const fileRef = useRef(null)
 
   function setField(k, v) {
     setForm(f => ({ ...f, [k]: v }))
   }
 
-  function pickPhoto(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase()
-    if (!ACCEPTED_EXT.includes(ext)) {
-      setErr('Photo must be a JPG, PNG, or HEIC.')
-      e.target.value = ''
-      return
-    }
-    if (file.size > MAX_BYTES) {
+  // Capture via the cross-platform adapter: native Camera (Take Photo /
+  // Choose from Library) on iOS, hidden file input on web. Both yield a
+  // dataUrl, kept for preview and converted to a Blob at submit time.
+  async function addPhoto() {
+    const captured = await capturePhoto()
+    if (!captured?.dataUrl) return
+    const blob = dataUrlToBlob(captured.dataUrl)
+    if (blob.size > MAX_BYTES) {
       setErr('Photo must be 5MB or smaller.')
-      e.target.value = ''
       return
     }
+    const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
     setErr(null)
-    setPhoto(file)
-    if (file.type.startsWith('image/') && !file.type.includes('heic')) {
-      const url = URL.createObjectURL(file)
-      setPhotoPreview(url)
-    } else {
-      setPhotoPreview(null)
-    }
+    setPhoto(blob)
+    setPhotoName(`photo.${ext}`)
+    setPhotoPreview(captured.dataUrl)
   }
 
   function clearPhoto() {
     setPhoto(null)
-    if (photoPreview) URL.revokeObjectURL(photoPreview)
+    setPhotoName('')
     setPhotoPreview(null)
-    if (fileRef.current) fileRef.current.value = ''
   }
 
   async function submit(e) {
