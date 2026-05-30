@@ -59,3 +59,11 @@ export function dataUrlToBlob(dataUrl) {
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
   return new Blob([bytes], { type: mime })
 }
+
+// Split a data URL into the { media_type, data } shape the Anthropic vision
+// API expects (base64 payload without the data-URL prefix).
+export function dataUrlToImageBlock(dataUrl) {
+  const [meta, b64] = dataUrl.split(',')
+  const media_type = /:(.*?);/.exec(meta)?.[1] || 'image/jpeg'
+  return { media_type, data: b64 || '' }
+}

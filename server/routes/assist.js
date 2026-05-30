@@ -24,9 +24,10 @@ router.get('/status', (_req, res) => {
 
 router.post('/', requireAuth, async (req, res, next) => {
   const start = Date.now()
-  const { messages } = req.body || {}
+  const { messages, image } = req.body || {}
   console.log('[assist] request', {
     messages: Array.isArray(messages) ? messages.length : null,
+    hasImage: Boolean(image?.data),
     userId: req.user?.id,
   })
 
@@ -35,6 +36,7 @@ router.post('/', requireAuth, async (req, res, next) => {
       taskType: 'assist_chat',
       userId: req.user?.id ?? null,
       messages,
+      image: image?.data && image?.media_type ? image : null,
       systemPrompt: SYSTEM_PROMPT,
     })
 

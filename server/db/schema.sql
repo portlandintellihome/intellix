@@ -348,3 +348,15 @@ CREATE TABLE IF NOT EXISTS composer_builds (
   checklist JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Jobsite documentation photos. file_path is the public URL path
+-- (/uploads/jobs/<uuid>.<ext>) served by the static mount in index.js,
+-- mirroring the support-ticket attachment pattern.
+CREATE TABLE IF NOT EXISTS job_photos (
+  id SERIAL PRIMARY KEY,
+  job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+  file_path TEXT NOT NULL,
+  uploaded_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_job_photos_job_id ON job_photos (job_id);

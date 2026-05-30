@@ -34,7 +34,9 @@ const app = express()
 const PORT = process.env.PORT
 
 app.use(cors())
-app.use(express.json())
+// Raised from the 100kb default so Assist can accept base64 image payloads
+// (vision attachments) in the JSON body. Multipart photo uploads bypass this.
+app.use(express.json({ limit: '15mb' }))
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' })

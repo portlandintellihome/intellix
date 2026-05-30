@@ -76,6 +76,7 @@ export async function processAIRequest(opts, deps = {}) {
     messages = null,
     systemPrompt = null,
     model = DEFAULT_MODEL,
+    image = null, // optional { media_type, data } base64 image for vision
   } = opts || {}
 
   if (!taskType) throw makeError('invalid_input', 'taskType is required', 400)
@@ -151,13 +152,33 @@ export async function processAIRequest(opts, deps = {}) {
 
   const client = anthropicClient || new Anthropic()
 
+  // Build the Anthropic payload from the validated string convo. When an
+  // image is attached, the final user turn becomes a multimodal content
+  // array (text + image block). convo stays string-only so validation, the
+  // PII guard, and audit logging above are unaffected. Images are NOT
+  // redacted — Claude vision sees whatever the user chose to attach.
+  let apiMessages = convo
+  if (image?.data && image?.media_type) {
+    const lastUserIdx = convo.length - 1
+    apiMessages = convo.map((m, i) => {
+      if (i !== lastUserIdx || m.role !== 'user') return m
+      return {
+        role: 'user',
+        content: [
+          ...(m.content ? [{ type: 'text', text: m.content }] : []),
+          { type: 'image', source: { type: 'base64', media_type: image.media_type, data: image.data } },
+        ],
+      }
+    })
+  }
+
   let response
   try {
     response = await client.messages.create({
       model,
       max_tokens: MAX_TOKENS,
       ...(systemPrompt ? { system: systemPrompt } : {}),
-      messages: convo,
+      messages: apiMessages,
     })
   } catch (err) {
     await logInteraction(queryFn, {

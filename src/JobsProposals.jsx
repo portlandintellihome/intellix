@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { apiGet } from './lib/api'
 import { colorForInitials } from './lib/color'
 import { getToken } from './lib/auth'
+import { capturePhoto, dataUrlToBlob } from './lib/photo'
 
 const BASE = import.meta.env.VITE_API_URL || ''
 
@@ -588,6 +589,7 @@ export default function JobsProposals() {
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button onClick={e => { e.stopPropagation(); setEditingJob(job) }} style={{ ...ghostBtn, fontSize: 11 }}>Edit</button>
                     </div>
+                    <JobPhotos jobId={job.id} />
                   </div>
                 )}
               </div>
@@ -641,6 +643,7 @@ export default function JobsProposals() {
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={e => { e.stopPropagation(); setEditingJob(job) }} style={{ ...ghostBtn, fontSize: 11 }}>Edit</button>
                       </div>
+                      <JobPhotos jobId={job.id} />
                     </div>
                   )}
                 </div>

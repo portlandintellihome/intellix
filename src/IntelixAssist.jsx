@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { useIsMobile } from './lib/useIsMobile'
 import { getToken } from './lib/auth'
+import { capturePhoto, dataUrlToImageBlock } from './lib/photo'
 
 const GREETING = "Hi — I'm Intellix Assist. I can help with Control4 programming, Composer Pro, proposals, client communication, and anything else your team needs. What can I help you with today?"
 
@@ -13,6 +14,9 @@ function Message({ msg }) {
         {isUser ? 'You' : 'AI'}
       </div>
       <div style={{ maxWidth: '75%', background: isUser ? '#1d1d1f' : 'var(--bg2)', border: isUser ? 'none' : '1px solid var(--border2)', borderRadius: isUser ? '12px 4px 12px 12px' : '4px 12px 12px 12px', padding: '10px 14px', fontSize: 13, color: isUser ? '#fff' : 'var(--text)', lineHeight: 1.6, fontFamily: 'var(--font)' }}>
+        {msg.image && (
+          <img src={msg.image} alt="Attached" style={{ display: 'block', maxWidth: '100%', maxHeight: 220, borderRadius: 8, marginBottom: msg.content ? 8 : 0 }} />
+        )}
         {msg.content}
         {msg.typing && <span style={{ display: 'inline-block', animation: 'pulse 1s infinite' }}>▋</span>}
       </div>
@@ -24,6 +28,7 @@ export default function IntelixAssist() {
   const isMobile = useIsMobile()
   const [messages, setMessages] = useState([{ role: 'assistant', content: GREETING }])
   const [input, setInput] = useState('')
+  const [attachedImage, setAttachedImage] = useState(null) // dataUrl, ephemeral
   const [loading, setLoading] = useState(false)
   const [apiConnected, setApiConnected] = useState(null)
   const bottomRef = useRef(null)
@@ -83,12 +88,22 @@ export default function IntelixAssist() {
       .catch(() => setApiConnected(false))
   }, [])
 
-  const send = async (text) => {
-    const content = text || input.trim()
-    if (!content || loading) return
-    setInput('')
+  const addAttachment = async () => {
+    const captured = await capturePhoto()
+    if (captured?.dataUrl) setAttachedImage(captured.dataUrl)
+  }
 
-    const nextMessages = [...messages, { role: 'user', content }]
+  const send = async (text) => {
+    const typed = text || input.trim()
+    // Allow sending an image with no text — fall back to a neutral prompt so
+    // the backend (which requires non-empty text on the last turn) accepts it.
+    if ((!typed && !attachedImage) || loading) return
+    const content = typed || 'Please take a look at this image.'
+    const imageDataUrl = attachedImage
+    setInput('')
+    setAttachedImage(null)
+
+    const nextMessages = [...messages, { role: 'user', content, image: imageDataUrl }]
     setMessages(nextMessages)
     setLoading(true)
 
@@ -103,6 +118,9 @@ export default function IntelixAssist() {
         },
         body: JSON.stringify({
           messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
+          // Image is sent separately and applied to the last user turn by the
+          // backend; it's ephemeral and not resent on later messages.
+          ...(imageDataUrl ? { image: dataUrlToImageBlock(imageDataUrl) } : {}),
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -178,7 +196,31 @@ export default function IntelixAssist() {
         background: 'var(--bg2)', borderTop: '1px solid var(--border2)', flexShrink: 0,
       }}>
         <div style={{ maxWidth: 760, margin: '0 auto' }}>
-          <div style={{ display: 'flex', gap: isMobile ? 8 : 10, alignItems: 'flex-end', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: isMobile ? '6px 6px 6px 12px' : '8px 8px 8px 14px' }}>
+          {/* Thumbnail of the pending attachment, with a remove (X) button. */}
+          {attachedImage && (
+            <div style={{ position: 'relative', display: 'inline-block', marginBottom: 8 }}>
+              <img src={attachedImage} alt="Attachment preview" style={{ height: 64, borderRadius: 8, border: '1px solid var(--border)', display: 'block' }} />
+              <button
+                onClick={() => setAttachedImage(null)}
+                aria-label="Remove attachment"
+                style={{ position: 'absolute', top: -8, right: -8, width: 22, height: 22, borderRadius: '50%', border: 'none', background: '#1d1d1f', color: '#fff', fontSize: 13, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >×</button>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: isMobile ? 8 : 10, alignItems: 'flex-end', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: isMobile ? '6px 6px 6px 8px' : '8px 8px 8px 10px' }}>
+            <button
+              onClick={addAttachment}
+              disabled={loading}
+              aria-label="Attach photo"
+              style={{
+                width: isMobile ? 40 : 32, height: isMobile ? 44 : 34,
+                borderRadius: isMobile ? 10 : 8, border: 'none', background: 'transparent',
+                color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: loading ? 'not-allowed' : 'pointer', flexShrink: 0,
+              }}
+            >
+              <svg width={isMobile ? 20 : 17} height={isMobile ? 20 : 17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            </button>
             <textarea
               ref={inputRef}
               value={input}
@@ -190,15 +232,15 @@ export default function IntelixAssist() {
             />
             <button
               onClick={() => send()}
-              disabled={!input.trim() || loading}
+              disabled={(!input.trim() && !attachedImage) || loading}
               aria-label="Send message"
               style={{
                 width: isMobile ? 48 : 34, height: isMobile ? 44 : 34,
                 borderRadius: isMobile ? 10 : 8, border: 'none',
-                background: input.trim() && !loading ? 'var(--accent)' : 'var(--bg4)',
-                color: input.trim() && !loading ? '#fff' : 'var(--text3)',
+                background: (input.trim() || attachedImage) && !loading ? 'var(--accent)' : 'var(--bg4)',
+                color: (input.trim() || attachedImage) && !loading ? '#fff' : 'var(--text3)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
+                cursor: (input.trim() || attachedImage) && !loading ? 'pointer' : 'not-allowed',
                 flexShrink: 0, transition: 'all 0.15s',
               }}
             >
