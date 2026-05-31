@@ -211,7 +211,6 @@ export default function SupportTickets() {
 
   useEffect(() => {
     load().finally(() => setLoading(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const ptr = usePullToRefresh(load)
