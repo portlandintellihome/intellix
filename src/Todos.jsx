@@ -68,6 +68,40 @@ function fmtDate(iso) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : '2-digit' })
 }
 
+// Locale-aware time-of-day, e.g. "3:00 PM".
+function fmtTime(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+// A due_at timestamp is "overdue" once it's in the past and not completed.
+function isOverdueAt(dueAt, completedAt) {
+  if (!dueAt || completedAt) return false
+  const d = new Date(dueAt)
+  return !Number.isNaN(d.getTime()) && d.getTime() < Date.now()
+}
+
+// <input type="time"> value ("HH:MM") → ISO timestamp on today's date, or
+// null when cleared. Local time → UTC instant via toISOString.
+function timeToISO(timeStr) {
+  if (!timeStr) return null
+  const [h, m] = timeStr.split(':').map(Number)
+  if (Number.isNaN(h) || Number.isNaN(m)) return null
+  const d = new Date()
+  d.setHours(h, m, 0, 0)
+  return d.toISOString()
+}
+
+// ISO timestamp → "HH:MM" local time for an <input type="time"> value.
+function isoToTimeInput(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 function dueState(iso, status) {
   if (!iso || status === 'done') return 'none'
   const today = new Date(); today.setHours(0,0,0,0)
@@ -159,6 +193,21 @@ function TodoCard({ todo, onClick, onToggle, draggable, onDragStart, onDragEnd, 
                 {fmtDate(todo.due_date)}
               </span>
             )}
+            {/* Time-of-day "due by" + completion metadata (subtle). */}
+            {todo.completed_at ? (
+              <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text3)' }}>
+                Completed at {fmtTime(todo.completed_at)}
+              </span>
+            ) : todo.due_at && (
+              <>
+                <span style={{ fontSize: 10.5, fontWeight: 600, color: isOverdueAt(todo.due_at, todo.completed_at) ? '#d70015' : 'var(--text3)' }}>
+                  Due by {fmtTime(todo.due_at)}
+                </span>
+                {isOverdueAt(todo.due_at, todo.completed_at) && (
+                  <span style={{ fontSize: 9.5, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(255,59,48,0.1)', color: '#d70015' }}>Overdue</span>
+                )}
+              </>
+            )}
             {todo.job_name && <Chip color="#0066cc">Job · {todo.job_name}</Chip>}
             {todo.client_name && <Chip color="#534AB7">{todo.client_name}</Chip>}
             {todo.ticket_short_id && <Chip color="#ff9500">{todo.ticket_short_id || `#${todo.ticket_id}`}</Chip>}
@@ -249,7 +298,7 @@ function NewTodoModal({ onClose, onCreated, isAdmin, currentUserId, users, jobs,
     title: '', description: '',
     assigned_to: currentUserId,
     priority: 'normal', status: 'open',
-    due_date: '',
+    due_date: '', due_time: '',
     job_id: '', client_id: '', ticket_id: '',
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -268,6 +317,7 @@ function NewTodoModal({ onClose, onCreated, isAdmin, currentUserId, users, jobs,
         priority: form.priority,
         status: form.status,
         due_date: form.due_date || null,
+        due_at: timeToISO(form.due_time),
         job_id: form.job_id ? Number(form.job_id) : null,
         client_id: form.client_id ? Number(form.client_id) : null,
         ticket_id: form.ticket_id ? Number(form.ticket_id) : null,
@@ -301,7 +351,7 @@ function NewTodoModal({ onClose, onCreated, isAdmin, currentUserId, users, jobs,
             <textarea style={{ ...inp, minHeight: 70, resize: 'vertical' }} placeholder="Optional notes…" value={form.description} onChange={e => set('description', e.target.value)} />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
               <div style={lbl}>Priority</div>
               <select style={inp} value={form.priority} onChange={e => set('priority', e.target.value)}>
@@ -314,9 +364,16 @@ function NewTodoModal({ onClose, onCreated, isAdmin, currentUserId, users, jobs,
                 {STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
               </select>
             </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
               <div style={lbl}>Due date</div>
               <input style={inp} type="date" value={form.due_date} onChange={e => set('due_date', e.target.value)} />
+            </div>
+            <div>
+              <div style={lbl}>Due by (optional)</div>
+              <input style={inp} type="time" value={form.due_time} onChange={e => set('due_time', e.target.value)} />
             </div>
           </div>
 
@@ -381,6 +438,7 @@ function SidePanel({ todo, onClose, onUpdate, onDelete, isAdmin, currentUserId, 
     priority: todo.priority || 'normal',
     status: todo.status || 'open',
     due_date: todo.due_date ? String(todo.due_date).slice(0, 10) : '',
+    due_time: isoToTimeInput(todo.due_at),
     job_id: todo.job_id || '',
     client_id: todo.client_id || '',
     ticket_id: todo.ticket_id || '',
@@ -402,6 +460,7 @@ function SidePanel({ todo, onClose, onUpdate, onDelete, isAdmin, currentUserId, 
         priority: form.priority,
         status: form.status,
         due_date: form.due_date || null,
+        due_at: form.due_time ? timeToISO(form.due_time) : null,
         job_id: form.job_id ? Number(form.job_id) : null,
         client_id: form.client_id ? Number(form.client_id) : null,
         ticket_id: form.ticket_id ? Number(form.ticket_id) : null,
@@ -482,6 +541,11 @@ function SidePanel({ todo, onClose, onUpdate, onDelete, isAdmin, currentUserId, 
           </div>
 
           <div style={{ marginBottom: 12 }}>
+            <div style={lbl}>Due by (optional)</div>
+            <input style={inp} type="time" value={form.due_time} onChange={e => set('due_time', e.target.value)} />
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
             <div style={lbl}>Linked job</div>
             <select style={inp} value={form.job_id} onChange={e => set('job_id', e.target.value)}>
               <option value="">— None —</option>
@@ -507,7 +571,7 @@ function SidePanel({ todo, onClose, onUpdate, onDelete, isAdmin, currentUserId, 
 
           <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border2)', fontSize: 11, color: 'var(--text3)', lineHeight: 1.6 }}>
             Created by {todo.created_by_name || '—'} · {fmtDate(todo.created_at)}
-            {todo.completed_at && <> · Completed {fmtDate(todo.completed_at)}</>}
+            {todo.completed_at && <> · Completed {fmtDate(todo.completed_at)} at {fmtTime(todo.completed_at)}</>}
           </div>
 
           {error && (

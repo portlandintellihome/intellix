@@ -336,6 +336,12 @@ CREATE INDEX IF NOT EXISTS idx_todos_assigned_to ON todos (assigned_to);
 CREATE INDEX IF NOT EXISTS idx_todos_status ON todos (status);
 CREATE INDEX IF NOT EXISTS idx_todos_due_date ON todos (due_date);
 
+-- "Due by" time-of-day support: due_at is a full timestamp (date defaults to
+-- the day the user set it). completed_at already exists above. Partial index
+-- to filter open (not-yet-completed) todos efficiently.
+ALTER TABLE todos ADD COLUMN IF NOT EXISTS due_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_todos_open ON todos (completed_at) WHERE completed_at IS NULL;
+
 CREATE TABLE IF NOT EXISTS composer_builds (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,

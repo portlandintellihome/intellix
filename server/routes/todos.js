@@ -7,7 +7,7 @@ const router = Router()
 const ALLOWED_PATCH = [
   'title', 'description',
   'assigned_to', 'job_id', 'client_id', 'ticket_id',
-  'priority', 'status', 'due_date',
+  'priority', 'status', 'due_date', 'due_at', 'completed_at',
 ]
 
 const SELECT_TODO = `
@@ -108,7 +108,7 @@ router.post('/', requireAuth, async (req, res, next) => {
     const {
       title, description,
       assigned_to, job_id, client_id, ticket_id,
-      priority, status, due_date,
+      priority, status, due_date, due_at,
     } = req.body || {}
 
     if (!title || typeof title !== 'string' || !title.trim()) {
@@ -125,12 +125,12 @@ router.post('/', requireAuth, async (req, res, next) => {
       INSERT INTO todos (
         title, description, assigned_to, created_by,
         job_id, client_id, ticket_id,
-        priority, status, due_date
+        priority, status, due_date, due_at
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7,
               COALESCE($8, 'normal'),
               COALESCE($9, 'open'),
-              $10)
+              $10, $11)
       RETURNING id`
 
     const { rows: inserted } = await query(insertSql, [
@@ -144,6 +144,7 @@ router.post('/', requireAuth, async (req, res, next) => {
       priority || null,
       status || null,
       due_date || null,
+      due_at || null,
     ])
 
     const { rows } = await query(`${SELECT_TODO} WHERE t.id = $1`, [inserted[0].id])
@@ -173,19 +174,31 @@ router.patch('/:id', requireAuth, async (req, res, next) => {
       delete body.assigned_to
     }
 
+    // When status is part of this PATCH, completed_at is derived from the
+    // transition (below) — ignore any raw completed_at in the body so we
+    // never emit two `completed_at = ...` clauses.
+    const fields = ('status' in body)
+      ? ALLOWED_PATCH.filter(f => f !== 'completed_at')
+      : ALLOWED_PATCH
+
     const sets = []
     const values = []
-    for (const f of ALLOWED_PATCH) {
+    for (const f of fields) {
       if (f in body) {
         values.push(body[f] === '' ? null : body[f])
         sets.push(`${f} = $${values.length}`)
       }
     }
 
-    // completed_at follows status transitions to/from 'done'.
+    // completed_at follows status transitions to/from 'done'. Marking done
+    // only stamps NOW() if not already completed (preserves the original
+    // completion time on repeated PATCHes); un-marking clears it.
     if ('status' in body) {
-      if (body.status === 'done') sets.push(`completed_at = NOW()`)
-      else                        sets.push(`completed_at = NULL`)
+      if (body.status === 'done') {
+        if (!todo.completed_at) sets.push(`completed_at = NOW()`)
+      } else {
+        sets.push(`completed_at = NULL`)
+      }
     }
     sets.push(`updated_at = NOW()`)
 

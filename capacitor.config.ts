@@ -12,6 +12,19 @@ const config: CapacitorConfig = {
       resize: 'native',
       resizeOnFullScreen: true,
     },
+    SplashScreen: {
+      launchShowDuration: 1500,
+      launchAutoHide: true,
+      backgroundColor: '#ffffff',
+      showSpinner: false,
+      splashFullScreen: false,
+      splashImmersive: false,
+    },
+    StatusBar: {
+      style: 'DEFAULT',
+      backgroundColor: '#ffffff',
+      overlaysWebView: false,
+    },
   },
 };
 

@@ -23,6 +23,8 @@
     "@capacitor/ios": "^8.3.4",
     "@capacitor/keyboard": "^8.0.3",
     "@capacitor/preferences": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.0",
     "@fontsource/montserrat": "^5.2.8",
     "axios": "^1.15.0",
     "bcrypt": "^6.0.0",
@@ -39,6 +41,7 @@
     "recharts": "^3.8.1"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.3.4",
     "@eslint/js": "^9.39.4",
     "@types/react": "^19.2.14",

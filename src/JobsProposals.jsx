@@ -551,6 +551,12 @@ export default function JobsProposals() {
   const [editingProposal, setEditingProposal] = useState(null)
   const [selected, setSelected] = useState(null)
 
+  // Reconcile a job updated inline (e.g. Notes) into the list + selection.
+  const onJobSaved = (updated) => {
+    setJobs(js => js.map(j => j.id === updated.id ? { ...j, ...updated } : j))
+    setSelected(sel => (sel?.id === updated.id ? { ...sel, ...updated } : sel))
+  }
+
   const reload = async () => {
     setLoadError('')
     try {
@@ -688,7 +694,7 @@ export default function JobsProposals() {
                 </div>
                 {selected?.kind === 'job' && selected?.id === job.id && (
                   <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border2)' }}>
-                    {job.scope && <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 10 }}><strong style={{ color: 'var(--text)' }}>Scope:</strong> {job.scope}</div>}
+                    <JobNotes job={job} onSaved={onJobSaved} />
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button onClick={e => { e.stopPropagation(); setEditingJob(job) }} style={{ ...ghostBtn, fontSize: 11 }}>Edit</button>
                     </div>
@@ -742,7 +748,7 @@ export default function JobsProposals() {
                   </div>
                   {selected?.kind === 'job' && selected?.id === job.id && (
                     <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border2)' }}>
-                      {job.scope && <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 10 }}><strong style={{ color: 'var(--text)' }}>Scope:</strong> {job.scope}</div>}
+                      <JobNotes job={job} onSaved={onJobSaved} />
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={e => { e.stopPropagation(); setEditingJob(job) }} style={{ ...ghostBtn, fontSize: 11 }}>Edit</button>
                       </div>
