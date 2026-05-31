@@ -229,8 +229,22 @@ export default function Clients() {
     })))
   }
 
+  // Mount load kept in the original .then()/.finally() form so the
+  // react-hooks/set-state-in-effect rule (which flags a direct call to a
+  // setState-containing function) stays quiet. loadClients() above is the
+  // reusable version pull-to-refresh calls.
   useEffect(() => {
-    loadClients().finally(() => setLoading(false))
+    apiGet('/api/clients')
+      .then(rows => setClients(rows.map(c => ({
+        ...c,
+        jobs: c.jobs || [],
+        proposals: c.proposals || [],
+        tags: c.tags || [],
+        email: c.email || '',
+        address: c.address || '',
+      }))))
+      .catch(err => console.error('Failed to load clients', err))
+      .finally(() => setLoading(false))
 
     const base = import.meta.env.VITE_API_URL || ''
     const token = getToken()

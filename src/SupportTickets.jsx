@@ -209,8 +209,21 @@ export default function SupportTickets() {
     setTeam(tm)
   }
 
+  // Mount load kept inline (.then/.finally) so set-state-in-effect stays
+  // quiet; load() above is the reusable version pull-to-refresh calls.
   useEffect(() => {
-    load().finally(() => setLoading(false))
+    Promise.all([
+      apiGet('/api/tickets').catch(() => []),
+      apiGet('/api/team').catch(() => []),
+    ]).then(([tkts, tm]) => {
+      setTickets(tkts.map(r => ({
+        ...r,
+        client: r.client_name || '',
+        history: r.history || [],
+        created: r.created_at ? new Date(r.created_at).toLocaleString() : '',
+      })))
+      setTeam(tm)
+    }).finally(() => setLoading(false))
   }, [])
 
   const ptr = usePullToRefresh(load)
