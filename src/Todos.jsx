@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { colorForInitials, initialsOf } from './lib/color'
 import { getToken } from './lib/auth'
+import * as haptics from './lib/haptics'
 
 const TOKEN_KEY = 'intellix_token'
 const PRIORITIES = [
@@ -476,6 +477,7 @@ function SidePanel({ todo, onClose, onUpdate, onDelete, isAdmin, currentUserId, 
 
   const remove = async () => {
     if (!confirm(`Delete “${todo.title}”?`)) return
+    haptics.heavy() // irreversible delete
     setDeleting(true); setError('')
     try {
       await authedJson(`/api/todos/${todo.id}`, { method: 'DELETE' })
@@ -666,11 +668,14 @@ export default function Todos() {
 
   const handleToggleComplete = async (todo) => {
     const next = todo.status === 'done' ? 'open' : 'done'
+    if (next === 'done') haptics.success() // completing a task
+    else haptics.light()                   // un-completing
     try {
       const updated = await authedJson(`/api/todos/${todo.id}`, { method: 'PATCH', body: JSON.stringify({ status: next }) })
       setTodos(ts => ts.map(t => t.id === updated.id ? updated : t))
       if (selected?.id === updated.id) setSelected(updated)
     } catch (err) {
+      haptics.error()
       alert(`Couldn't update: ${err.message}`)
     }
   }

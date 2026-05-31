@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core'
 import { useIsMobile } from './lib/useIsMobile'
 import { getToken } from './lib/auth'
 import { capturePhoto, dataUrlToImageBlock } from './lib/photo'
+import * as haptics from './lib/haptics'
 
 const GREETING = "Hi — I'm Intellix Assist. I can help with Control4 programming, Composer Pro, proposals, client communication, and anything else your team needs. What can I help you with today?"
 
@@ -98,6 +99,7 @@ export default function IntelixAssist() {
     // Allow sending an image with no text — fall back to a neutral prompt so
     // the backend (which requires non-empty text on the last turn) accepts it.
     if ((!typed && !attachedImage) || loading) return
+    haptics.medium() // confirm the send
     const content = typed || 'Please take a look at this image.'
     const imageDataUrl = attachedImage
     setInput('')

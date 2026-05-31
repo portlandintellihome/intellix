@@ -19,13 +19,20 @@ const glyphPng = await sharp(Buffer.from(
    </svg>`
 )).png().toBuffer()
 
+// Trim to the glyph's true bbox, then scale it up so its longest dimension
+// fills ~70% of the canvas (TARGET px, ~150px margin/side) — the rendered
+// glyph only occupied ~40%, leaving too much padding.
+const TARGET = 720
 const glyphTrimmed = await sharp(glyphPng).trim().toBuffer()
+const glyphScaled = await sharp(glyphTrimmed)
+  .resize({ width: TARGET, height: TARGET, fit: 'inside' })
+  .toBuffer()
 
 await sharp({ create: { width: ICON, height: ICON, channels: 4, background: '#ffffff' } })
-  .composite([{ input: glyphTrimmed, gravity: 'center' }])
+  .composite([{ input: glyphScaled, gravity: 'center' }])
   .png()
   .toFile('assets/icon-source.png')
-console.log('wrote assets/icon-source.png (trimmed + center-composited)')
+console.log('wrote assets/icon-source.png (trimmed + scaled to ~70% + center-composited)')
 
 const splashSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="2732" height="2732" viewBox="0 0 2732 2732">
   <rect width="2732" height="2732" fill="#ffffff"/>
