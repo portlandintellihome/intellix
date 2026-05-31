@@ -438,6 +438,76 @@ function ProposalModal({ initial, clients, locations, onClose, onSaved }) {
   )
 }
 
+// --- JobNotes — inline-editable notes (DB column stays `scope`) for one job
+function JobNotes({ job, onSaved }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(job.scope || '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const start = (e) => {
+    e.stopPropagation()
+    setValue(job.scope || '')
+    setError('')
+    setEditing(true)
+  }
+
+  const cancel = (e) => {
+    e?.stopPropagation()
+    setEditing(false)
+    setError('')
+  }
+
+  const save = async (e) => {
+    e?.stopPropagation()
+    const next = value.trim()
+    if (next === (job.scope || '')) { setEditing(false); return }
+    setSaving(true); setError('')
+    try {
+      const updated = await api(`/api/jobs/${job.id}`, { method: 'PATCH', body: { scope: next || null } })
+      haptics.medium() // notes saved
+      onSaved(updated)
+      setEditing(false)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <div style={{ marginBottom: 10 }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>Notes</div>
+        <textarea
+          autoFocus
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          placeholder="Add notes about this job…"
+          style={{ width: '100%', minHeight: 64, resize: 'vertical', background: 'rgba(0,102,204,0.04)', border: '1px solid var(--accent)', borderRadius: 8, padding: '8px 10px', fontSize: 11.5, color: 'var(--text)', fontFamily: 'var(--font)', outline: 'none', boxSizing: 'border-box', lineHeight: 1.5 }}
+        />
+        {error && <div style={{ fontSize: 10.5, color: '#d70015', marginTop: 4 }}>{error}</div>}
+        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+          <button onClick={save} disabled={saving} style={{ ...primaryBtn, fontSize: 11, padding: '6px 12px', opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save'}</button>
+          <button onClick={cancel} disabled={saving} style={{ ...ghostBtn, fontSize: 11, padding: '6px 12px' }}>Cancel</button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div onClick={start} style={{ marginBottom: 10, cursor: 'text' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Notes</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </div>
+      <div style={{ fontSize: 11.5, color: job.scope ? 'var(--text2)' : 'var(--text3)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+        {job.scope || 'Tap to add notes…'}
+      </div>
+    </div>
+  )
+}
+
 // --- JobPhotos — thumbnail grid + capture + lightbox for one job's photos
 function JobPhotos({ jobId }) {
   const [photos, setPhotos] = useState([])
