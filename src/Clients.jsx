@@ -229,7 +229,6 @@ export default function Clients() {
     })))
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadClients().finally(() => setLoading(false))
 
