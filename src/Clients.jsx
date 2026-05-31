@@ -229,6 +229,7 @@ export default function Clients() {
     })))
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadClients().finally(() => setLoading(false))
 
@@ -238,7 +239,6 @@ export default function Clients() {
       .then(r => r.ok ? r.json() : [])
       .then(setLocations)
       .catch(() => {})
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const ptr = usePullToRefresh(loadClients)
