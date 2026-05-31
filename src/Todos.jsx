@@ -325,6 +325,7 @@ function NewTodoModal({ onClose, onCreated, isAdmin, currentUserId, users, jobs,
         ticket_id: form.ticket_id ? Number(form.ticket_id) : null,
       }
       const created = await authedJson('/api/todos', { method: 'POST', body: JSON.stringify(body) })
+      haptics.medium() // to-do created
       onCreated(created)
       onClose()
     } catch (err) {
@@ -375,7 +376,7 @@ function NewTodoModal({ onClose, onCreated, isAdmin, currentUserId, users, jobs,
             </div>
             <div>
               <div style={lbl}>Due by (optional)</div>
-              <input style={inp} type="time" value={form.due_time} onChange={e => set('due_time', e.target.value)} />
+              <input style={inp} type="time" value={form.due_time} onChange={e => { set('due_time', e.target.value); if (e.target.value) haptics.light() }} />
             </div>
           </div>
 
@@ -468,6 +469,7 @@ function SidePanel({ todo, onClose, onUpdate, onDelete, isAdmin, currentUserId, 
         ticket_id: form.ticket_id ? Number(form.ticket_id) : null,
       }
       const updated = await authedJson(`/api/todos/${todo.id}`, { method: 'PATCH', body: JSON.stringify(body) })
+      haptics.medium() // to-do saved
       onUpdate(updated)
     } catch (err) {
       setError(err.message)
@@ -545,7 +547,7 @@ function SidePanel({ todo, onClose, onUpdate, onDelete, isAdmin, currentUserId, 
 
           <div style={{ marginBottom: 12 }}>
             <div style={lbl}>Due by (optional)</div>
-            <input style={inp} type="time" value={form.due_time} onChange={e => set('due_time', e.target.value)} />
+            <input style={inp} type="time" value={form.due_time} onChange={e => { set('due_time', e.target.value); if (e.target.value) haptics.light() }} />
           </div>
 
           <div style={{ marginBottom: 12 }}>

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { apiGet } from './lib/api'
 import { getToken } from './lib/auth'
+import * as haptics from './lib/haptics'
+import { usePullToRefresh, PullIndicator } from './lib/usePullToRefresh'
 
 const tagColors = {
   VIP: { bg: 'rgba(83,74,183,0.1)', color: '#534AB7' },
@@ -65,7 +67,7 @@ function NewClientModal({ onClose }) {
         </div>
         <div style={{ padding: '14px 22px', borderTop: '1px solid var(--border2)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button onClick={onClose} style={ghostBtn}>Cancel</button>
-          <button style={primaryBtn}>Add client</button>
+          <button onClick={() => haptics.medium()} style={primaryBtn}>Add client</button>
         </div>
       </div>
     </div>
@@ -215,18 +217,20 @@ export default function Clients() {
   const [selected, setSelected] = useState(null)
   const location = useLocation()
 
+  const loadClients = async () => {
+    const rows = await apiGet('/api/clients').catch(err => { console.error('Failed to load clients', err); return [] })
+    setClients(rows.map(c => ({
+      ...c,
+      jobs: c.jobs || [],
+      proposals: c.proposals || [],
+      tags: c.tags || [],
+      email: c.email || '',
+      address: c.address || '',
+    })))
+  }
+
   useEffect(() => {
-    apiGet('/api/clients')
-      .then(rows => setClients(rows.map(c => ({
-        ...c,
-        jobs: c.jobs || [],
-        proposals: c.proposals || [],
-        tags: c.tags || [],
-        email: c.email || '',
-        address: c.address || '',
-      }))))
-      .catch(err => console.error('Failed to load clients', err))
-      .finally(() => setLoading(false))
+    loadClients().finally(() => setLoading(false))
 
     const base = import.meta.env.VITE_API_URL || ''
     const token = getToken()
@@ -234,7 +238,10 @@ export default function Clients() {
       .then(r => r.ok ? r.json() : [])
       .then(setLocations)
       .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const ptr = usePullToRefresh(loadClients)
 
   const onClientLocationChanged = (updated) => {
     setClients(cs => cs.map(c => c.id === updated.id ? { ...c, location_id: updated.location_id } : c))
@@ -300,7 +307,8 @@ export default function Clients() {
         ))}
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+      <div {...ptr.handlers} style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+        <PullIndicator pull={ptr.pull} refreshing={ptr.refreshing} />
         <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 500, marginBottom: 12 }}>{filtered.length} client{filtered.length !== 1 ? 's' : ''}</div>
         {filtered.length === 0 && clients.length === 0 && (
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>

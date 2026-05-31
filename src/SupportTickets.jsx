@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { apiGet } from './lib/api'
 import { colorForInitials } from './lib/color'
-import { usePullToRefresh, PullIndicator } from './lib/usePullToRefresh'
 import * as haptics from './lib/haptics'
+import { usePullToRefresh, PullIndicator } from './lib/usePullToRefresh'
 
 const typeColors = {
   Device: { bg: 'rgba(255,59,48,0.08)', color: '#d70015' },
@@ -195,20 +195,26 @@ export default function SupportTickets() {
 
   const [team, setTeam] = useState([])
 
-  useEffect(() => {
-    Promise.all([
+  const load = async () => {
+    const [tkts, tm] = await Promise.all([
       apiGet('/api/tickets').catch(() => []),
       apiGet('/api/team').catch(() => []),
-    ]).then(([tkts, tm]) => {
-      setTickets(tkts.map(r => ({
-        ...r,
-        client: r.client_name || '',
-        history: r.history || [],
-        created: r.created_at ? new Date(r.created_at).toLocaleString() : '',
-      })))
-      setTeam(tm)
-    }).finally(() => setLoading(false))
+    ])
+    setTickets(tkts.map(r => ({
+      ...r,
+      client: r.client_name || '',
+      history: r.history || [],
+      created: r.created_at ? new Date(r.created_at).toLocaleString() : '',
+    })))
+    setTeam(tm)
+  }
+
+  useEffect(() => {
+    load().finally(() => setLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const ptr = usePullToRefresh(load)
 
   if (loading) {
     return (
