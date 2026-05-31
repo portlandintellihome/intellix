@@ -1,3 +1,6 @@
+/* eslint-disable react-refresh/only-export-components */
+// This module intentionally exports both a hook (usePullToRefresh) and a
+// small companion component (PullIndicator); they're always used together.
 import { useRef, useState, useCallback } from 'react'
 import * as haptics from './haptics'
 
