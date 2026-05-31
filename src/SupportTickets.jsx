@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { apiGet } from './lib/api'
 import { colorForInitials } from './lib/color'
+import { usePullToRefresh, PullIndicator } from './lib/usePullToRefresh'
+import * as haptics from './lib/haptics'
 
 const typeColors = {
   Device: { bg: 'rgba(255,59,48,0.08)', color: '#d70015' },
@@ -89,7 +91,7 @@ function NewTicketModal({ onClose, team }) {
         </div>
         <div style={{ padding: '14px 22px', borderTop: '1px solid var(--border2)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button onClick={onClose} style={ghostBtn}>Cancel</button>
-          <button style={primaryBtn}>Create ticket</button>
+          <button onClick={() => haptics.medium()} style={primaryBtn}>Create ticket</button>
         </div>
       </div>
     </div>
@@ -266,7 +268,8 @@ export default function SupportTickets() {
         ))}
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+      <div {...ptr.handlers} style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+        <PullIndicator pull={ptr.pull} refreshing={ptr.refreshing} />
         <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 500, marginBottom: 12 }}>{filtered.length} ticket{filtered.length !== 1 ? 's' : ''}</div>
         {filtered.length === 0 && tickets.length === 0 && (
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>

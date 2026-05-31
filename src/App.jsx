@@ -14,6 +14,7 @@ import ResetPassword from './ResetPassword'
 import Support from './Support'
 import { useIsMobile } from './lib/useIsMobile'
 import { initToken, getToken, authHeader, clearToken } from './lib/auth'
+import * as haptics from './lib/haptics'
 
 const Dashboard = lazy(() => import('./Dashboard'))
 const JobsProposals = lazy(() => import('./JobsProposals'))
@@ -358,6 +359,7 @@ function AppShell({ user, dark, setDark, logout }) {
                 key={item.path}
                 to={item.path}
                 end={item.end}
+                onClick={() => haptics.light()}
                 style={({ isActive }) => ({
                   flex: 1,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -429,6 +431,7 @@ export default function App() {
   }, [dark])
 
   const logout = () => {
+    haptics.light()
     clearToken()
     setUser(null)
   }

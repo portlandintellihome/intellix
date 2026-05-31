@@ -69,3 +69,21 @@ html.dark, .dark {
     line-height: 1.5;
   }
 }
+
+/* iOS-style tap feedback: a quick, subtle press state on tappable controls.
+   Scoped to buttons + role=button; the transition back is fast on release. */
+button,
+[role="button"] {
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+button:active,
+[role="button"]:active {
+  opacity: 0.7;
+  transform: scale(0.98);
+}
+button:disabled,
+button:disabled:active {
+  opacity: 0.5;
+  transform: none;
+}

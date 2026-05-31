@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { colorForInitials, initialsOf } from './lib/color'
 import { getToken } from './lib/auth'
 import * as haptics from './lib/haptics'
+import { usePullToRefresh, PullIndicator } from './lib/usePullToRefresh'
 
 const TOKEN_KEY = 'intellix_token'
 const PRIORITIES = [
@@ -666,6 +667,8 @@ export default function Todos() {
 
   useEffect(() => { fetchTodos() }, [me, filter, teamView, assignedFilter])
 
+  const ptr = usePullToRefresh(fetchTodos)
+
   const handleToggleComplete = async (todo) => {
     const next = todo.status === 'done' ? 'open' : 'done'
     if (next === 'done') haptics.success() // completing a task
@@ -743,7 +746,8 @@ export default function Todos() {
         )}
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg)' }}>
+      <div {...ptr.handlers} style={{ flex: 1, overflowY: 'auto', background: 'var(--bg)' }}>
+        <PullIndicator pull={ptr.pull} refreshing={ptr.refreshing} />
         {error && (
           <div style={{ background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.25)', borderRadius: 10, padding: '10px 14px', margin: '14px 24px', fontSize: 12, color: '#d70015' }}>
             {error}

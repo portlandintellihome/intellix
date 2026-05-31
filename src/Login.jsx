@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { setToken } from './lib/auth'
 import { Link } from 'react-router-dom'
+import * as haptics from './lib/haptics'
 
 const lbl = { fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }
 const inp = { width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 13px', fontSize: 13, color: 'var(--text)', fontFamily: 'var(--font)', outline: 'none' }
@@ -41,6 +42,7 @@ export default function Login({ onLogin }) {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Something went wrong')
       await setToken(data.token)
+      haptics.medium() // successful login
       onLogin(data.user)
     } catch (err) {
       setError(err.message)

@@ -3,6 +3,8 @@ import { apiGet } from './lib/api'
 import { colorForInitials } from './lib/color'
 import { getToken } from './lib/auth'
 import { capturePhoto, dataUrlToBlob } from './lib/photo'
+import * as haptics from './lib/haptics'
+import { usePullToRefresh, PullIndicator } from './lib/usePullToRefresh'
 
 const BASE = import.meta.env.VITE_API_URL || ''
 
@@ -201,6 +203,7 @@ function JobModal({ initial, clients, locations, team, onClose, onSaved }) {
       const saved = isEdit
         ? await api(`/api/jobs/${initial.id}`, { method: 'PATCH', body: payload })
         : await api('/api/jobs', { method: 'POST', body: payload })
+      haptics.medium() // job saved
       onSaved(saved)
     } catch (err) {
       setError(err.message)
@@ -457,6 +460,7 @@ function JobPhotos({ jobId }) {
 
   const add = async () => {
     setError('')
+    haptics.light() // add-photo tap
     const captured = await capturePhoto()
     if (!captured?.dataUrl) return
     const blob = dataUrlToBlob(captured.dataUrl)
@@ -487,6 +491,7 @@ function JobPhotos({ jobId }) {
 
   const remove = async (photo) => {
     if (!window.confirm('Delete this photo?')) return
+    haptics.heavy() // irreversible photo delete
     try {
       await api(`/api/jobs/${jobId}/photos/${photo.id}`, { method: 'DELETE' })
       setPhotos(p => p.filter(x => x.id !== photo.id))
@@ -594,6 +599,8 @@ export default function JobsProposals() {
     reload().finally(() => setLoading(false))
   }, [])
 
+  const ptr = usePullToRefresh(reload)
+
   const locationName = (id) => locations.find(l => l.id === id)?.name
 
   const onSaved = () => {
@@ -662,7 +669,8 @@ export default function JobsProposals() {
         ))}
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+      <div {...ptr.handlers} style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+        <PullIndicator pull={ptr.pull} refreshing={ptr.refreshing} />
         {loadError && (
           <div style={{ background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: '#d70015' }}>
             Failed to load: {loadError} <button onClick={reload} style={{ marginLeft: 8, background: 'none', border: 'none', color: '#d70015', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'var(--font)' }}>Retry</button>
