@@ -71,6 +71,8 @@ router.get('/due', requireInternalKey, async (_req, res, next) => {
               c.notes        AS client_notes,
               loc.id         AS location_id,
               loc.name       AS location_name,
+              loc.support_phone AS location_phone,
+              loc.support_email AS location_email,
               loc.google_review_url AS location_review_url
          FROM jobs j
          JOIN clients c ON c.id = j.client_id
@@ -130,7 +132,12 @@ router.get('/due', requireInternalKey, async (_req, res, next) => {
           const gen = await generateCheckinEmail({
             client: { id: r.client_id, name: r.client_name, address: values.address },
             job: { id: r.job_id, name: r.job_name, scope: r.job_scope, notes: r.client_notes, assigned: r.job_assigned },
-            location: { google_review_url: reviewUrl },
+            location: {
+              name: r.location_name,
+              phone: r.location_phone,
+              email: r.location_email,
+              google_review_url: reviewUrl,
+            },
             days_since_install: daysSince,
             tone,
           })

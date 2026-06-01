@@ -248,3 +248,24 @@ test('generateCheckinEmail assembles prompt with client/job context and skips PI
   assert.match(userMsg, /g\.page\/r\/abc\/review/)
   assert.match(userMsg, /alarm code 1234/) // not blocked → skipPiiGuard works
 })
+
+test('generateCheckinEmail sign-off uses ONLY the provided location contact', async () => {
+  const queryFn = makeQueryFn()
+  let captured = null
+  const anthropic = {
+    messages: { create: async (args) => { captured = args; return { content: [{ type: 'text', text: '{"subject":"x","html_body":"<p>y</p>"}' }], stop_reason: 'end_turn', usage: {} } } },
+  }
+  await generateCheckinEmail({
+    ...CHECKIN_CTX,
+    location: { name: 'Portland', phone: '(503) 500-0180', email: 'pdx@x.com', google_review_url: 'https://g.page/r/abc/review' },
+  }, { queryFn, anthropic })
+  const userMsg = captured.messages[captured.messages.length - 1].content
+  assert.match(userMsg, /IntelliHome AV Portland/)
+  assert.match(userMsg, /\(503\) 500-0180/)
+  assert.match(userMsg, /pdx@x\.com/)
+  // No other office (e.g. the LA number) should be injected by our code.
+  assert.doesNotMatch(userMsg, /310/)
+  // System prompt forbids emojis + character-level formatting.
+  assert.match(captured.system, /Do not use any emojis/i)
+  assert.match(captured.system, /plain paragraphs/i)
+})

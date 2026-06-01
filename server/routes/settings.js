@@ -87,7 +87,12 @@ router.post('/checkin-preview', async (req, res, next) => {
         scope: 'Control4 EA-3 controller, Sonos Arc + sub, Lutron Caséta lighting (4 rooms), ' +
           'Araknis network, "Movie Night" and "Good Morning" scenes.',
       },
-      location: { google_review_url: 'https://g.page/r/your-place-id/review' },
+      location: {
+        name: 'Portland',
+        phone: '(503) 500-0180',
+        email: 'info@intellihomeav.com',
+        google_review_url: 'https://g.page/r/your-place-id/review',
+      },
       days_since_install: 1,
       tone,
     })

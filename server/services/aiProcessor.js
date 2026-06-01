@@ -325,15 +325,36 @@ const CHECKIN_SYSTEM_PROMPT =
   'You are writing a follow-up email from IntelliHome AV (a Control4 dealer) to a customer about ' +
   'a day after their installation. The tone is warm, brief, and human — not a corporate template. ' +
   'Reference what was installed (from the job notes/details provided), thank them by first name, and ' +
-  'invite them to leave a Google review at the provided link. Keep it under 150 words. Embed the ' +
-  'review link as a clean, clickable button or link. Do NOT write "Dear [Customer]" — use natural ' +
-  'phrasing like "Hi {first_name},". Format as email-safe HTML (inline styles only; no <html>/<head>/' +
-  '<body> wrapper, no markdown). Return ONLY a JSON object: {"subject": "...", "html_body": "..."} ' +
-  'with no surrounding prose or code fences. Do not invent installed equipment beyond the details given.'
+  'invite them to leave a Google review at the provided link. Keep it under 150 words. Do NOT write ' +
+  '"Dear [Customer]" — use natural phrasing like "Hi {first_name},". ' +
+  // (1) No emojis.
+  'Do not use any emojis, emoticons, or decorative symbols anywhere in the email. The email should ' +
+  'read as a clean, human-written follow-up. ' +
+  // (2) No character-level formatting; only the CTA button may carry styling.
+  'Do not use bold, italic, underline, or any character-level formatting in the body text. The only ' +
+  'HTML allowed for styling is the CTA button at the bottom (a "Leave Us a Review" link). All other ' +
+  'content must be plain paragraphs (<p> tags only) — no <strong>, <b>, <em>, <i>, <u>, <h1>-<h6>, ' +
+  'or <ul>/<li>. ' +
+  // (3) Per-location sign-off — handled by the user message which supplies the
+  // single correct location's contact info; reinforce single-office rule here.
+  'Sign the email with IntelliHome AV\'s contact info for the ONE location provided in the user ' +
+  'message only — do not reference, mention, or list any other office, city, or phone number. ' +
+  'Format as email-safe HTML (inline styles only; no <html>/<head>/<body> wrapper, no markdown). ' +
+  'Return ONLY a JSON object: {"subject": "...", "html_body": "..."} with no surrounding prose or ' +
+  'code fences. Do not invent installed equipment beyond the details given.'
 
-// Build the user message from the job/client context.
+// Build the user message from the job/client context. The single correct
+// location (the one that did the install) supplies the only contact info that
+// should appear in the sign-off — never the global multi-office string.
 function buildCheckinUserMessage({ client = {}, job = {}, location = {}, days_since_install, tone }) {
   const toneDesc = CHECKIN_TONES[tone] || CHECKIN_TONES.warm
+  const locName = location.name ? `IntelliHome AV ${location.name}` : 'IntelliHome AV'
+  const signoff = [
+    `Sign the email with this ONE location's contact info only — ${locName}`,
+    location.phone ? `, phone ${location.phone}` : '',
+    location.email ? `, email ${location.email}` : '',
+    '. Do not reference any other office or location.',
+  ].join('')
   return [
     `Desired tone: ${toneDesc}.`,
     '',
@@ -343,7 +364,7 @@ function buildCheckinUserMessage({ client = {}, job = {}, location = {}, days_si
     `Days since install: ${days_since_install ?? '(about 1)'}`,
     `Technicians: ${Array.isArray(job.technicians) ? job.technicians.join(', ') : (job.assigned ? [].concat(job.assigned).join(', ') : '(not provided)')}`,
     `Google review link to embed: ${location.google_review_url || '(none provided — omit the review button if blank)'}`,
-    'Dealer contact to sign off with: ' + INTELLIHOME_CONTACT,
+    signoff,
     '',
     'What was installed / job notes (base the email on this; do not fabricate beyond it):',
     '"""',
