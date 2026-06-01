@@ -270,6 +270,15 @@ CREATE TABLE IF NOT EXISTS proposals (
   assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+-- Backfill columns for databases whose proposals table predates these being
+-- added to the CREATE TABLE above. `CREATE TABLE IF NOT EXISTS` does NOT add
+-- new columns to an existing table, so any column introduced into the CREATE
+-- block after a deploy must ALSO be declared as an idempotent ALTER here or
+-- it silently never lands on the existing (production) DB. address +
+-- assigned_to were edited into the CREATE block but never added as ALTERs,
+-- which is why proposal edits 42703'd on prod (missing `address`).
+ALTER TABLE proposals ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE proposals ADD COLUMN IF NOT EXISTS assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE proposals ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id);
 UPDATE proposals SET location_id = COALESCE(
     (SELECT location_id FROM clients WHERE clients.id = proposals.client_id),
