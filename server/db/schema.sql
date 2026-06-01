@@ -246,14 +246,33 @@ CREATE TABLE IF NOT EXISTS inventory (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Column names here match what production actually has (connection_type,
+-- added_at). An earlier schema edit renamed these to connection/created_at
+-- only in the CREATE block, which never reached the live table (CREATE TABLE
+-- IF NOT EXISTS is a no-op on an existing table) — so the live names won, and
+-- route/UI code reads them. Keep declaring the live names; the RENAMEs below
+-- are idempotent (guarded) so a fresh DB built straight from this CREATE is
+-- already correct and the guards simply no-op.
 CREATE TABLE IF NOT EXISTS drivers (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   category TEXT,
-  connection TEXT,
+  connection_type TEXT,
   filename TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  added_at TIMESTAMPTZ DEFAULT NOW()
 );
+-- Idempotent reconcilers: if an older DB still has the pre-rename names,
+-- bring them to the live names. No-op once already in the target state.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='drivers' AND column_name='connection')
+     AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='drivers' AND column_name='connection_type')
+  THEN ALTER TABLE drivers RENAME COLUMN connection TO connection_type; END IF;
+END $$;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='drivers' AND column_name='created_at')
+     AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='drivers' AND column_name='added_at')
+  THEN ALTER TABLE drivers RENAME COLUMN created_at TO added_at; END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS proposals (
   id SERIAL PRIMARY KEY,
@@ -280,6 +299,12 @@ CREATE TABLE IF NOT EXISTS proposals (
 ALTER TABLE proposals ADD COLUMN IF NOT EXISTS address TEXT;
 ALTER TABLE proposals ADD COLUMN IF NOT EXISTS assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE proposals ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id);
+-- LEGACY: production's proposals table also has an older `assigned` column
+-- (from before assigned_to existed). It is intentionally left in place — it
+-- may hold real data and nothing reads/writes it, so dropping it is a
+-- data-loss risk with no benefit. It is deliberately NOT declared above, so
+-- verifySchema() won't flag it (the guard only checks declared→live, never
+-- live→declared). Do not "tidy" it away without a data audit + migration.
 UPDATE proposals SET location_id = COALESCE(
     (SELECT location_id FROM clients WHERE clients.id = proposals.client_id),
     1

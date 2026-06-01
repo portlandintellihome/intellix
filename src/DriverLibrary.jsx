@@ -87,9 +87,9 @@ export default function DriverLibrary() {
       .then(rows => setDrivers(rows.map(d => ({
         ...d,
         cat: d.category,
-        conn: d.connection,
+        conn: d.connection_type,
         file: d.filename,
-        added: d.created_at ? new Date(d.created_at).toLocaleDateString() : '',
+        added: d.added_at ? new Date(d.added_at).toLocaleDateString() : '',
       }))))
       .catch(err => console.error('Failed to load drivers', err))
   }, [])

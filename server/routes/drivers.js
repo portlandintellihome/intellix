@@ -5,7 +5,7 @@ const router = Router()
 
 router.get('/', async (_req, res, next) => {
   try {
-    const { rows } = await query('SELECT * FROM drivers ORDER BY created_at DESC')
+    const { rows } = await query('SELECT * FROM drivers ORDER BY added_at DESC')
     res.json(rows)
   } catch (err) { next(err) }
 })
