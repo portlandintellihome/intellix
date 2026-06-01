@@ -77,6 +77,8 @@ export async function processAIRequest(opts, deps = {}) {
     systemPrompt = null,
     model = DEFAULT_MODEL,
     image = null, // optional { media_type, data } base64 image for vision
+    skipPiiGuard = false, // bypass the hard-block PII guard (see below)
+    maxTokens = MAX_TOKENS,
   } = opts || {}
 
   if (!taskType) throw makeError('invalid_input', 'taskType is required', 400)
@@ -124,7 +126,11 @@ export async function processAIRequest(opts, deps = {}) {
   }
 
   // Hard-block PII guard on every user-authored message in the convo.
-  for (const m of convo) {
+  // Customer-document generation sets skipPiiGuard: the client's name, phone,
+  // email and address ARE the document's required content (not stray PII
+  // leaking into a chat), so guarding them would block the feature. The
+  // per-client opt-out + audit logging above still apply.
+  for (const m of (skipPiiGuard ? [] : convo)) {
     if (m.role !== 'user') continue
     const guard = guardPII(m.content)
     if (guard.blocked) {
@@ -176,7 +182,7 @@ export async function processAIRequest(opts, deps = {}) {
   try {
     response = await client.messages.create({
       model,
-      max_tokens: MAX_TOKENS,
+      max_tokens: maxTokens,
       ...(systemPrompt ? { system: systemPrompt } : {}),
       messages: apiMessages,
     })
@@ -219,4 +225,84 @@ export async function processAIRequest(opts, deps = {}) {
 
 function combinedText(convo) {
   return convo.map(m => `${m.role}: ${m.content}`).join('\n\n')
+}
+
+// ---------------------------------------------------------------------------
+// Customer document generation
+// ---------------------------------------------------------------------------
+
+const INTELLIHOME_CONTACT =
+  'IntelliHome AV — Portland (503) 500-0180 · Los Angeles (310) 409-7655 · info@intellihomeav.com'
+
+const DOC_SYSTEM_PROMPTS = {
+  handover_guide:
+    'You are writing a polished, friendly system handover document for a homeowner from ' +
+    'IntelliHome AV, a Control4 dealer. The tone is warm, professional, and clear — assume the ' +
+    'reader is not technical. The document should welcome them to their new system, summarize ' +
+    'what was installed, explain how to use the key features in plain language, and provide ' +
+    'guidance on getting support. Format the response as clean semantic HTML (no markdown, no ' +
+    '<html>/<head>/<body> wrapper — just the content elements). Use <h1>, <h2>, <p>, <ul>, etc. ' +
+    'Include sections for: Welcome, Your System Overview, How to Use It, Common Scenarios, ' +
+    'Care & Maintenance, and Getting Help (with IntelliHome AV contact info). The document is ' +
+    'meant to be printed/downloaded as a PDF so it should read well as a single document, not as ' +
+    'a web page. Do not invent equipment or features that are not supported by the details given.',
+  quick_reference:
+    'You are creating a one-page quick reference card for a homeowner — printable, scannable, ' +
+    'focused on the most useful day-to-day information. Format as clean HTML (no markdown, no ' +
+    '<html>/<head>/<body> wrapper) designed to fit on one printed page. Use a compact layout ' +
+    'where appropriate. Include only essential information: lighting scenes (if any), AV system ' +
+    'basics, security/thermostat shortcuts, and an emergency contact for IntelliHome AV. Avoid ' +
+    'lengthy explanations — this is a fridge-magnet style reference, not a manual. Use <h2> for ' +
+    'section headers, <ul> or <table> for entries, keep total content tight. Only include the ' +
+    'most-used commands and shortcuts; omit anything not clearly supported by the details given.',
+}
+
+export const DOC_TYPES = Object.keys(DOC_SYSTEM_PROMPTS)
+
+// Build the user message that carries all the context the model needs.
+function buildDocUserMessage(form = {}, detailsText = '') {
+  const techs = Array.isArray(form.technicians)
+    ? form.technicians.join(', ')
+    : (form.technicians || '')
+  const lines = [
+    'Generate the document using the following information.',
+    '',
+    `Client: ${form.client_name || '(unknown)'}`,
+    `Site address: ${form.address || '(not provided)'}`,
+    `Install date: ${form.install_date || '(not provided)'}`,
+    `Primary contact: ${form.contact_name || '(not provided)'}` +
+      `${form.phone ? ` · ${form.phone}` : ''}${form.email ? ` · ${form.email}` : ''}`,
+    `Installed by: ${techs || '(not provided)'}`,
+    `Dealer contact to include in the document: ${INTELLIHOME_CONTACT}`,
+    '',
+    'Installation & configuration details from the technician (the source of truth — base the ',
+    'document on this; do not fabricate beyond it):',
+    '"""',
+    detailsText || '(no details provided)',
+    '"""',
+  ]
+  return lines.join('\n')
+}
+
+// generateDocument(docType, { form_data, details_text }, deps?) → { html, usage }
+// Routes through processAIRequest so per-client opt-out + audit logging apply,
+// with skipPiiGuard since the customer's own contact details are the document
+// content. Vision is intentionally not used (text in, HTML out).
+export async function generateDocument(docType, payload = {}, deps = {}) {
+  const system = DOC_SYSTEM_PROMPTS[docType]
+  if (!system) {
+    throw makeError('invalid_input', `Unknown doc_type "${docType}". Expected one of: ${DOC_TYPES.join(', ')}`, 400)
+  }
+  const { form_data = {}, details_text = '', userId = null, clientId = null, jobId = null } = payload
+
+  const result = await processAIRequest({
+    taskType: `homedoc_${docType}`,
+    userId, clientId, jobId,
+    systemPrompt: system,
+    prompt: buildDocUserMessage(form_data, details_text),
+    skipPiiGuard: true,
+    maxTokens: 4096,
+  }, deps)
+
+  return { html: result.reply, usage: result.usage }
 }

@@ -400,3 +400,31 @@ CREATE TABLE IF NOT EXISTS job_photos (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_job_photos_job_id ON job_photos (job_id);
+
+-- AI-generated customer documents (Customer System Handover Guide / Quick
+-- Reference Card). form_data + details_text are persisted so a doc can be
+-- regenerated; generated_html is the Claude output rendered/downloaded as PDF
+-- client-side. Per the schema-drift guard convention, every column is ALSO
+-- declared as an idempotent ALTER below so additions reach existing DBs (a
+-- column added only to the CREATE block never lands on an already-created
+-- table).
+CREATE TABLE IF NOT EXISTS homedocs (
+  id SERIAL PRIMARY KEY,
+  client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+  doc_type TEXT NOT NULL,
+  form_data JSONB,
+  details_text TEXT,
+  generated_html TEXT,
+  generated_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE homedocs ADD COLUMN IF NOT EXISTS client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE;
+ALTER TABLE homedocs ADD COLUMN IF NOT EXISTS job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL;
+ALTER TABLE homedocs ADD COLUMN IF NOT EXISTS doc_type TEXT;
+ALTER TABLE homedocs ADD COLUMN IF NOT EXISTS form_data JSONB;
+ALTER TABLE homedocs ADD COLUMN IF NOT EXISTS details_text TEXT;
+ALTER TABLE homedocs ADD COLUMN IF NOT EXISTS generated_html TEXT;
+ALTER TABLE homedocs ADD COLUMN IF NOT EXISTS generated_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE homedocs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+CREATE INDEX IF NOT EXISTS idx_homedocs_client_created ON homedocs (client_id, created_at DESC);

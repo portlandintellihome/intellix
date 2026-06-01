@@ -25,6 +25,7 @@ import todosRouter from './routes/todos.js'
 import supportRouter from './routes/support.js'
 import integrationsRouter from './routes/integrations.js'
 import webhooksRouter from './routes/webhooks.js'
+import homedocsRouter from './routes/homedocs.js'
 import { migrate } from './db/migrate.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -62,6 +63,7 @@ app.use('/api/todos', todosRouter)
 app.use('/api/support', supportRouter)
 app.use('/api/integrations', integrationsRouter)
 app.use('/api/webhooks', webhooksRouter)
+app.use('/api/homedocs', homedocsRouter)
 
 // Public read-only access to uploaded support photos. The directory is
 // resolved the same way support.js resolves UPLOAD_DIR, so the static mount
