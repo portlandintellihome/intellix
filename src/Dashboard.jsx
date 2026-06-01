@@ -45,9 +45,8 @@ const s = {
   teamRowLast: { display:'flex', alignItems:'center', gap:10, padding:'8px 0' },
 }
 
-export default function Dashboard({ setupDone }) {
+export default function Dashboard() {
   const navigate = useNavigate()
-  const showBanner = !setupDone
 
   const [jobs, setJobs] = useState([])
   const [tickets, setTickets] = useState([])
@@ -104,22 +103,6 @@ export default function Dashboard({ setupDone }) {
           {new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })}
         </div>
       </div>
-
-      {/* SETUP BANNER */}
-      {showBanner && (
-        <div style={{ margin:'14px 24px 0', borderRadius:11, border:'1px solid rgba(0,102,204,0.2)', background:'rgba(0,102,204,0.06)', padding:'12px 14px', display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
-          <div style={{ width:32, height:32, minWidth:32, borderRadius:8, background:'var(--accent)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-          </div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--text)', marginBottom:2 }}>Finish setting up Intellix</div>
-            <div style={{ fontSize:10.5, color:'var(--text2)' }}>Complete the setup checklist to get your team live.</div>
-          </div>
-          <button onClick={() => navigate('/settings')} style={{ padding:'7px 12px', borderRadius:7, fontSize:11, fontWeight:700, cursor:'pointer', border:'none', background:'#1d1d1f', color:'#fff', fontFamily:'var(--font)', whiteSpace:'nowrap' }}>
-            Complete setup ↗
-          </button>
-        </div>
-      )}
 
       <div style={s.content}>
 

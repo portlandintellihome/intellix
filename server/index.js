@@ -22,7 +22,6 @@ import aiRouter from './routes/ai.js'
 import settingsRouter from './routes/settings.js'
 import reportingRouter from './routes/reporting.js'
 import todosRouter from './routes/todos.js'
-import supportRouter from './routes/support.js'
 import integrationsRouter from './routes/integrations.js'
 import webhooksRouter from './routes/webhooks.js'
 import homedocsRouter from './routes/homedocs.js'
@@ -60,14 +59,13 @@ app.use('/api/ai', aiRouter)
 app.use('/api/settings', settingsRouter)
 app.use('/api/reporting', reportingRouter)
 app.use('/api/todos', todosRouter)
-app.use('/api/support', supportRouter)
 app.use('/api/integrations', integrationsRouter)
 app.use('/api/webhooks', webhooksRouter)
 app.use('/api/homedocs', homedocsRouter)
 
-// Public read-only access to uploaded support photos. The directory is
-// resolved the same way support.js resolves UPLOAD_DIR, so the static mount
-// matches whatever volume Railway provides at runtime.
+// Public read-only access to uploaded photos (job photos live under
+// /uploads/jobs). UPLOAD_DIR is the Railway volume mount; the static mount
+// matches whatever volume the platform provides at runtime.
 const uploadsRoot = process.env.UPLOAD_DIR
   ? path.dirname(process.env.UPLOAD_DIR)
   : (fs.existsSync('/uploads') ? '/uploads' : path.resolve(process.cwd(), 'uploads'))

@@ -306,3 +306,85 @@ export async function generateDocument(docType, payload = {}, deps = {}) {
 
   return { html: result.reply, usage: result.usage }
 }
+
+// ---------------------------------------------------------------------------
+// AI-personalized post-job check-in email
+// ---------------------------------------------------------------------------
+
+const CHECKIN_TONES = {
+  warm: 'warm and casual — like a friendly text from someone who genuinely cares',
+  professional: 'professional and polished — courteous and concise, still human',
+}
+
+function firstNameOf(fullName) {
+  if (!fullName) return 'there'
+  return String(fullName).trim().split(/\s+/)[0] || 'there'
+}
+
+const CHECKIN_SYSTEM_PROMPT =
+  'You are writing a follow-up email from IntelliHome AV (a Control4 dealer) to a customer about ' +
+  'a day after their installation. The tone is warm, brief, and human — not a corporate template. ' +
+  'Reference what was installed (from the job notes/details provided), thank them by first name, and ' +
+  'invite them to leave a Google review at the provided link. Keep it under 150 words. Embed the ' +
+  'review link as a clean, clickable button or link. Do NOT write "Dear [Customer]" — use natural ' +
+  'phrasing like "Hi {first_name},". Format as email-safe HTML (inline styles only; no <html>/<head>/' +
+  '<body> wrapper, no markdown). Return ONLY a JSON object: {"subject": "...", "html_body": "..."} ' +
+  'with no surrounding prose or code fences. Do not invent installed equipment beyond the details given.'
+
+// Build the user message from the job/client context.
+function buildCheckinUserMessage({ client = {}, job = {}, location = {}, days_since_install, tone }) {
+  const toneDesc = CHECKIN_TONES[tone] || CHECKIN_TONES.warm
+  return [
+    `Desired tone: ${toneDesc}.`,
+    '',
+    `Customer first name: ${firstNameOf(client.name)}`,
+    `Customer full name: ${client.name || '(unknown)'}`,
+    `Install address: ${client.address || job.address || '(not provided)'}`,
+    `Days since install: ${days_since_install ?? '(about 1)'}`,
+    `Technicians: ${Array.isArray(job.technicians) ? job.technicians.join(', ') : (job.assigned ? [].concat(job.assigned).join(', ') : '(not provided)')}`,
+    `Google review link to embed: ${location.google_review_url || '(none provided — omit the review button if blank)'}`,
+    'Dealer contact to sign off with: ' + INTELLIHOME_CONTACT,
+    '',
+    'What was installed / job notes (base the email on this; do not fabricate beyond it):',
+    '"""',
+    [job.name, job.scope, job.details, job.notes].filter(Boolean).join('\n') || '(no details provided)',
+    '"""',
+  ].join('\n')
+}
+
+// Strip accidental code fences and parse the JSON the model returns.
+function parseCheckinJson(reply) {
+  let s = String(reply || '').trim()
+  s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+  try {
+    const obj = JSON.parse(s)
+    if (obj && typeof obj.subject === 'string' && typeof obj.html_body === 'string') return obj
+  } catch { /* fall through */ }
+  return null
+}
+
+// generateCheckinEmail({ client, job, location, days_since_install, tone }, deps?)
+//   → { subject, html_body, usage }
+// Routes through processAIRequest (audit logging + opt-out apply). skipPiiGuard
+// because the customer's own name/address are required email content. Throws
+// makeError('missing_key', ...) when ANTHROPIC_API_KEY is absent.
+export async function generateCheckinEmail(ctx = {}, deps = {}) {
+  const result = await processAIRequest({
+    taskType: 'checkin_email',
+    userId: ctx.userId ?? null,
+    clientId: ctx.client?.id ?? ctx.clientId ?? null,
+    jobId: ctx.job?.id ?? ctx.jobId ?? null,
+    systemPrompt: CHECKIN_SYSTEM_PROMPT,
+    prompt: buildCheckinUserMessage(ctx),
+    skipPiiGuard: true,
+    maxTokens: 1024,
+  }, deps)
+
+  const parsed = parseCheckinJson(result.reply)
+  if (!parsed) {
+    throw makeError('upstream', 'AI returned an unparseable check-in email (expected JSON with subject + html_body).', 502)
+  }
+  return { subject: parsed.subject, html_body: parsed.html_body, usage: result.usage }
+}
+
+export { CHECKIN_TONES }

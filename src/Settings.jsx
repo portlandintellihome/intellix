@@ -96,26 +96,30 @@ function CompanyInfo({ data, onChange }) {
   )
 }
 
-// Render an HTML email body with the same {{placeholder}} substitution
-// the backend uses, so the live preview matches what'll actually go out.
-function substitute(template, values) {
-  if (!template) return ''
-  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key) =>
-    values[key] != null ? String(values[key]) : `{{${key}}}`
-  )
-}
-
 function CheckIns({ data, onChange }) {
-  const sample = {
-    first_name: 'Jamie',
-    full_name: 'Jamie Reyes',
-    address: '742 Evergreen Terrace, Portland OR',
-    review_url: 'https://g.page/r/your-place-id/review',
-    support_url: 'https://intellix.example.com/support',
-    job_name: 'Living-room theater install',
+  const [preview, setPreview] = useState(null)   // { subject, html_body }
+  const [previewing, setPreviewing] = useState(false)
+  const [previewErr, setPreviewErr] = useState('')
+
+  const runPreview = async () => {
+    setPreviewing(true); setPreviewErr(''); setPreview(null)
+    try {
+      const base = import.meta.env.VITE_API_URL || ''
+      const token = getToken()
+      const res = await fetch(`${base}/api/settings/checkin-preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ tone: data.checkin_tone || 'warm' }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(d.error || `${res.status}`)
+      setPreview(d)
+    } catch (err) {
+      setPreviewErr(err.message)
+    } finally {
+      setPreviewing(false)
+    }
   }
-  const previewSubject = substitute(data.checkin_email_subject || '', sample)
-  const previewHtml = substitute(data.checkin_email_body || '', sample)
 
   return (
     <div style={s.card}>
@@ -123,12 +127,12 @@ function CheckIns({ data, onChange }) {
         <div>
           <div style={s.cardHeaderTitle}>Post-job check-in</div>
           <div style={s.cardHeaderSub}>
-            Sent automatically a few days after a job is marked Complete. Asks for a Google review if everything's great, offers the support form if it's not. The review URL comes from the job's <strong>location</strong> — set those in the Locations section above.
+            Check-in emails are personalized by AI for each customer using their job details. The email includes a thank-you, a reference to what was installed, and a link to leave a Google review. The review URL comes from the job's <strong>location</strong> — set those in the Locations section above.
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 12, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 12, marginBottom: 14 }}>
         <div>
           <div style={lbl}>Days after completion</div>
           <input
@@ -140,49 +144,34 @@ function CheckIns({ data, onChange }) {
           />
         </div>
         <div>
-          <div style={lbl}>Email subject</div>
-          <input
-            style={inp}
-            value={data.checkin_email_subject || ''}
-            onChange={e => onChange('checkin_email_subject', e.target.value)}
-            placeholder="How's your IntelliHome system working?"
-          />
+          <div style={lbl}>Tone</div>
+          <select style={inp} value={data.checkin_tone || 'warm'} onChange={e => onChange('checkin_tone', e.target.value)}>
+            <option value="warm">Warm &amp; casual</option>
+            <option value="professional">Professional &amp; polished</option>
+          </select>
         </div>
       </div>
 
-      <div style={{ marginBottom: 12 }}>
-        <div style={lbl}>Email body (HTML)</div>
-        <textarea
-          rows={14}
-          style={{
-            ...inp,
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-            fontSize: 12,
-            lineHeight: 1.5,
-            resize: 'vertical',
-            minHeight: 220,
-          }}
-          value={data.checkin_email_body || ''}
-          onChange={e => onChange('checkin_email_body', e.target.value)}
-        />
-        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
-          Placeholders: <code>{`{{first_name}}`}</code>, <code>{`{{full_name}}`}</code>, <code>{`{{address}}`}</code>, <code>{`{{review_url}}`}</code>, <code>{`{{support_url}}`}</code>, <code>{`{{job_name}}`}</code>.
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <button type="button" onClick={runPreview} disabled={previewing} style={{ ...primaryBtn, opacity: previewing ? 0.6 : 1, cursor: previewing ? 'wait' : 'pointer' }}>
+          {previewing ? 'Generating…' : 'Preview Example'}
+        </button>
+        <span style={{ fontSize: 11, color: 'var(--text3)' }}>Generates a sample with fake customer data so you can check the AI output.</span>
       </div>
 
-      <div>
-        <div style={{ ...lbl, marginBottom: 8 }}>Live preview</div>
+      {previewErr && (
+        <div style={{ background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.25)', borderRadius: 8, padding: '9px 12px', fontSize: 11.5, color: '#d70015', fontWeight: 500, marginBottom: 12 }}>{previewErr}</div>
+      )}
+
+      {preview && (
         <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
           <div style={{ background: 'var(--bg3)', padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, color: 'var(--text2)' }}>
-            <div><strong style={{ color: 'var(--text)' }}>Subject:</strong> {previewSubject || <em style={{ color: 'var(--text3)' }}>(empty)</em>}</div>
-            <div><strong style={{ color: 'var(--text)' }}>To:</strong> {sample.first_name} ({sample.full_name})</div>
+            <div><strong style={{ color: 'var(--text)' }}>Subject:</strong> {preview.subject}</div>
+            <div><strong style={{ color: 'var(--text)' }}>To:</strong> Jamie (Jamie Reyes) — sample</div>
           </div>
-          <div
-            style={{ padding: 0, color: '#1d1d1f', background: '#fff' }}
-            dangerouslySetInnerHTML={{ __html: previewHtml || '<div style="padding:24px;color:#999;font-size:13px;">(empty body)</div>' }}
-          />
+          <div style={{ padding: 0, color: '#1d1d1f', background: '#fff' }} dangerouslySetInnerHTML={{ __html: preview.html_body }} />
         </div>
-      </div>
+      )}
     </div>
   )
 }

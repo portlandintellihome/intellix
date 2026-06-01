@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Briefcase, Users, HeadphonesIcon,
+  LayoutDashboard, Briefcase, Users,
   CalendarDays, Wrench, Library, Package,
   Bot, Users2, BarChart3, Plug, Settings, LogOut, Mail, FolderOpen,
   Menu, X, CheckSquare, ListChecks
@@ -11,7 +11,6 @@ import Login from './Login'
 import ChangePassword from './ChangePassword'
 import ForgotPassword from './ForgotPassword'
 import ResetPassword from './ResetPassword'
-import Support from './Support'
 import { useIsMobile } from './lib/useIsMobile'
 import { initToken, getToken, authHeader, clearToken } from './lib/auth'
 import * as haptics from './lib/haptics'
@@ -19,7 +18,6 @@ import * as haptics from './lib/haptics'
 const Dashboard = lazy(() => import('./Dashboard'))
 const JobsProposals = lazy(() => import('./JobsProposals'))
 const Clients = lazy(() => import('./Clients'))
-const SupportTickets = lazy(() => import('./SupportTickets'))
 const CalendarPage = lazy(() => import('./Calendar'))
 const ComposerBuilds = lazy(() => import('./ComposerBuilds'))
 const DriverLibrary = lazy(() => import('./DriverLibrary'))
@@ -40,7 +38,6 @@ const NAV = [
   { path: '/reporting', label: 'Reporting', icon: BarChart3 },
   { path: '/jobs', label: 'Jobs & proposals', icon: Briefcase },
   { path: '/clients', label: 'Clients', icon: Users },
-  { path: '/tickets', label: 'Support tickets', icon: HeadphonesIcon },
   { path: '/calendar', label: 'Calendar', icon: CalendarDays },
   { path: '/todos', label: 'To-dos', icon: CheckSquare },
   { path: '/outreach', label: 'Outreach', icon: Mail },
@@ -64,7 +61,7 @@ const NAV = [
 const ROLE_ACCESS = {
   Admin: '*',
   Programmer: new Set(['/', '/jobs', '/composer', '/drivers', '/homedoc', '/assist', '/todos', '/integrations']),
-  Technician: new Set(['/', '/jobs', '/tickets', '/calendar', '/composer', '/todos', '/integrations']),
+  Technician: new Set(['/', '/jobs', '/calendar', '/composer', '/todos', '/integrations']),
 }
 
 function canAccess(role, path) {
@@ -313,10 +310,9 @@ function AppShell({ user, dark, setDark, logout }) {
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13, fontFamily: 'var(--font)' }}>Loading…</div>
         }>
           <Routes>
-            <Route path="/" element={guard('/', <Dashboard setupDone={false} />)} />
+            <Route path="/" element={guard('/', <Dashboard />)} />
             <Route path="/jobs" element={guard('/jobs', <JobsProposals />)} />
             <Route path="/clients" element={guard('/clients', <Clients />)} />
-            <Route path="/tickets" element={guard('/tickets', <SupportTickets />)} />
             <Route path="/calendar" element={guard('/calendar', <CalendarPage />)} />
             <Route path="/todos" element={guard('/todos', <Todos />)} />
             <Route path="/outreach" element={guard('/outreach', <Outreach />)} />
@@ -460,8 +456,6 @@ function AppRouter({ user, setUser, dark, setDark, authChecking, logout }) {
   // signing in. Render before any auth gate.
   if (location.pathname === '/forgot-password') return <ForgotPassword />
   if (location.pathname === '/reset-password') return <ResetPassword />
-  // Public client-facing support intake form — no app chrome, no auth.
-  if (location.pathname === '/support') return <Support />
 
   if (authChecking) {
     return (

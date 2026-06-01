@@ -12,6 +12,7 @@
 
 import { Router } from 'express'
 import { query } from '../db.js'
+import { generateCheckinEmail, isAIConfigured } from '../services/aiProcessor.js'
 
 const router = Router()
 
@@ -47,20 +48,27 @@ router.get('/due', requireInternalKey, async (_req, res, next) => {
     const settings = settingsRes.rows[0] || {}
     const delayDays = Number.isFinite(Number(settings.checkin_delay_days))
       ? Number(settings.checkin_delay_days) : 3
+    const tone = settings.checkin_tone || 'warm'
+    // Static template kept ONLY as a fallback when AI generation isn't
+    // available/fails (so the n8n batch still sends something sensible).
     const subjectTpl = settings.checkin_email_subject || "How's your IntelliHome system working?"
     const bodyTpl = settings.checkin_email_body || ''
     const supportUrl = (process.env.PUBLIC_BASE_URL || '').replace(/\/+$/, '') + '/support'
+    const aiOn = isAIConfigured()
 
     const { rows } = await query(
       `SELECT j.id           AS job_id,
               j.name         AS job_name,
               j.address      AS job_address,
+              j.scope        AS job_scope,
+              j.assigned     AS job_assigned,
               j.completed_at,
               j.location_id  AS job_location_id,
               c.id           AS client_id,
               c.name         AS client_name,
               c.email        AS client_email,
               c.address      AS client_address,
+              c.notes        AS client_notes,
               loc.id         AS location_id,
               loc.name       AS location_name,
               loc.google_review_url AS location_review_url
@@ -106,6 +114,39 @@ router.get('/due', requireInternalKey, async (_req, res, next) => {
         job_name: r.job_name || '',
         location_name: r.location_name || '',
       }
+
+      // Days since install, for the AI prompt.
+      const daysSince = r.completed_at
+        ? Math.max(1, Math.round((Date.now() - new Date(r.completed_at).getTime()) / 86400000))
+        : null
+
+      // Per-send AI personalization. Falls back to the static template if AI
+      // is unconfigured or generation fails, so the n8n batch never breaks.
+      let subject = substitute(subjectTpl, values)
+      let html_body = substitute(bodyTpl, values)
+      let source = 'template'
+      if (aiOn) {
+        try {
+          const gen = await generateCheckinEmail({
+            client: { id: r.client_id, name: r.client_name, address: values.address },
+            job: { id: r.job_id, name: r.job_name, scope: r.job_scope, notes: r.client_notes, assigned: r.job_assigned },
+            location: { google_review_url: reviewUrl },
+            days_since_install: daysSince,
+            tone,
+          })
+          subject = gen.subject
+          html_body = gen.html_body
+          source = 'ai'
+          // Audit log of the email we're handing to the sender.
+          await query(
+            `INSERT INTO checkin_emails_sent (job_id, client_id, subject, html_body) VALUES ($1,$2,$3,$4)`,
+            [r.job_id, r.client_id, subject, html_body],
+          ).catch(logErr => console.error('[checkins] failed to log sent email', logErr?.message))
+        } catch (genErr) {
+          console.error('[checkins] AI generation failed; using template fallback', { job_id: r.job_id, error: genErr?.message })
+        }
+      }
+
       result.push({
         job_id: r.job_id,
         client_id: r.client_id,
@@ -115,14 +156,16 @@ router.get('/due', requireInternalKey, async (_req, res, next) => {
         client_email: r.client_email,
         client_address: values.address,
         completed_at: r.completed_at,
-        subject: substitute(subjectTpl, values),
-        html_body: substitute(bodyTpl, values),
+        source,
+        subject,
+        html_body,
       })
     }
 
     res.json({
       delay_days: delayDays,
-      configured: Boolean(bodyTpl),
+      ai_personalized: aiOn,
+      configured: aiOn || Boolean(bodyTpl),
       count: result.length,
       skipped_count: skipped.length,
       skipped,

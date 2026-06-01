@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { processAIRequest } from './aiProcessor.js'
+import { processAIRequest, generateCheckinEmail } from './aiProcessor.js'
 
 // --- helpers ----------------------------------------------------------------
 
@@ -175,4 +175,76 @@ test('does not check opt-out when clientId is null', async () => {
     queryFn.calls.some(c => c.sql.startsWith('SELECT ai_opt_out')),
     false,
   )
+})
+
+// --- generateCheckinEmail ---------------------------------------------------
+
+const CHECKIN_CTX = {
+  client: { id: 5, name: 'Jamie Reyes', address: '742 Evergreen Terrace' },
+  job: { id: 9, name: 'Theater install', scope: 'Control4 EA-3, Sonos Arc' },
+  location: { google_review_url: 'https://g.page/r/abc/review' },
+  days_since_install: 1,
+  tone: 'warm',
+}
+
+test('generateCheckinEmail returns {subject, html_body} parsed from AI JSON', async () => {
+  const queryFn = makeQueryFn()
+  const anthropic = makeAnthropic({ text: JSON.stringify({ subject: 'Thanks, Jamie!', html_body: '<p>Hi Jamie</p>' }) })
+  const out = await generateCheckinEmail(CHECKIN_CTX, { queryFn, anthropic })
+  assert.equal(out.subject, 'Thanks, Jamie!')
+  assert.equal(out.html_body, '<p>Hi Jamie</p>')
+})
+
+test('generateCheckinEmail strips code fences around the JSON', async () => {
+  const queryFn = makeQueryFn()
+  const fenced = '```json\n{"subject":"S","html_body":"<p>B</p>"}\n```'
+  const anthropic = makeAnthropic({ text: fenced })
+  const out = await generateCheckinEmail(CHECKIN_CTX, { queryFn, anthropic })
+  assert.equal(out.subject, 'S')
+  assert.equal(out.html_body, '<p>B</p>')
+})
+
+test('generateCheckinEmail throws upstream when AI returns non-JSON', async () => {
+  const queryFn = makeQueryFn()
+  const anthropic = makeAnthropic({ text: 'Sorry, here is your email: Hi Jamie...' })
+  await assert.rejects(
+    generateCheckinEmail(CHECKIN_CTX, { queryFn, anthropic }),
+    err => err.code === 'upstream',
+  )
+})
+
+test('generateCheckinEmail surfaces missing_key when ANTHROPIC_API_KEY is unset', async () => {
+  const queryFn = makeQueryFn()
+  const prevKey = process.env.ANTHROPIC_API_KEY
+  delete process.env.ANTHROPIC_API_KEY
+  try {
+    await assert.rejects(
+      generateCheckinEmail(CHECKIN_CTX, { queryFn }), // no injected client → real key path
+      err => err.code === 'missing_key',
+    )
+  } finally {
+    if (prevKey !== undefined) process.env.ANTHROPIC_API_KEY = prevKey
+  }
+})
+
+test('generateCheckinEmail assembles prompt with client/job context and skips PII guard', async () => {
+  const queryFn = makeQueryFn()
+  let captured = null
+  const anthropic = {
+    messages: {
+      create: async (args) => {
+        captured = args
+        return { content: [{ type: 'text', text: '{"subject":"x","html_body":"<p>y</p>"}' }], stop_reason: 'end_turn', usage: {} }
+      },
+    },
+  }
+  // A phone-number-like string in scope would trip the PII guard if not skipped.
+  await generateCheckinEmail(
+    { ...CHECKIN_CTX, job: { ...CHECKIN_CTX.job, scope: 'alarm code 1234 programmed' } },
+    { queryFn, anthropic },
+  )
+  const userMsg = captured.messages[captured.messages.length - 1].content
+  assert.match(userMsg, /Jamie Reyes/)
+  assert.match(userMsg, /g\.page\/r\/abc\/review/)
+  assert.match(userMsg, /alarm code 1234/) // not blocked → skipPiiGuard works
 })

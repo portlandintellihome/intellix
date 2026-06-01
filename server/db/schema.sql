@@ -121,6 +121,13 @@ ALTER TABLE settings DROP COLUMN IF EXISTS google_review_url;
 -- Drop the legacy global review link too — review URLs are per-location now.
 ALTER TABLE settings DROP COLUMN IF EXISTS google_review_link;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS checkin_delay_days INTEGER DEFAULT 3;
+-- Voice preference passed to the AI check-in generator ('warm' | 'professional').
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS checkin_tone TEXT DEFAULT 'warm';
+-- DEPRECATED: checkin_email_subject / checkin_email_body were the manually-edited
+-- static templates. Check-in emails are now AI-generated per send via
+-- aiProcessor.generateCheckinEmail (see /api/checkins/due). These columns are
+-- retained for data safety + as a fallback if AI generation fails; the Settings
+-- UI no longer edits them. Do not drop without confirming nothing reads them.
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS checkin_email_subject TEXT
   DEFAULT 'How''s your IntelliHome system working?';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS checkin_email_body TEXT;
@@ -200,6 +207,11 @@ CREATE TABLE IF NOT EXISTS team_members (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- DEPRECATED FEATURE: the Support Tickets UI (src/SupportTickets.jsx), the
+-- public intake form (src/Support.jsx + /api/support), and that route were
+-- removed. This table is RETAINED for data safety — historical tickets live
+-- here and tickets.js / reporting.js / todos.js still reference it. Do not
+-- drop without a data audit + removing those references.
 CREATE TABLE IF NOT EXISTS support_tickets (
   id SERIAL PRIMARY KEY,
   ticket_id TEXT UNIQUE,
@@ -428,3 +440,21 @@ ALTER TABLE homedocs ADD COLUMN IF NOT EXISTS generated_html TEXT;
 ALTER TABLE homedocs ADD COLUMN IF NOT EXISTS generated_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE homedocs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 CREATE INDEX IF NOT EXISTS idx_homedocs_client_created ON homedocs (client_id, created_at DESC);
+
+-- Audit log of AI-generated check-in emails actually sent, so the team can
+-- review past output for quality. Written by /api/checkins/due when it
+-- generates an email (token usage is also captured in ai_interactions).
+CREATE TABLE IF NOT EXISTS checkin_emails_sent (
+  id SERIAL PRIMARY KEY,
+  job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+  client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+  subject TEXT,
+  html_body TEXT,
+  sent_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE checkin_emails_sent ADD COLUMN IF NOT EXISTS job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL;
+ALTER TABLE checkin_emails_sent ADD COLUMN IF NOT EXISTS client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL;
+ALTER TABLE checkin_emails_sent ADD COLUMN IF NOT EXISTS subject TEXT;
+ALTER TABLE checkin_emails_sent ADD COLUMN IF NOT EXISTS html_body TEXT;
+ALTER TABLE checkin_emails_sent ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ DEFAULT NOW();
+CREATE INDEX IF NOT EXISTS idx_checkin_emails_sent_job ON checkin_emails_sent (job_id, sent_at DESC);
