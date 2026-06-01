@@ -190,7 +190,7 @@ export async function handleProposalSync(body, integration, queryFn) {
     } else {
       const jobIns = await q(
         `INSERT INTO jobs (name, client_id, address, status, priority, scope, location_id, proposal_id)
-         VALUES ($1, $2, $3, 'Scheduled', 'Normal', $4, $5, $6)
+         VALUES ($1, $2, $3, 'scheduled', 'Normal', $4, $5, $6)
          RETURNING id`,
         [
           name || `Proposal ${portal_proposal_id}`,

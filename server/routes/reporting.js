@@ -64,7 +64,7 @@ router.get('/', async (req, res, next) => {
     ] = await Promise.all([
       query(`SELECT COALESCE(SUM(total), 0)::float AS v FROM proposals
              WHERE status = 'Accepted' AND created_at >= date_trunc('month', NOW())`),
-      query(`SELECT COUNT(*)::int AS v FROM jobs WHERE status IS NOT NULL AND status <> 'Complete'`),
+      query(`SELECT COUNT(*)::int AS v FROM jobs WHERE status IS NOT NULL AND status <> 'completed'`),
       query(`SELECT COUNT(*)::int AS v FROM support_tickets WHERE status <> 'Resolved'`),
       query(`SELECT COUNT(*)::int AS v FROM clients WHERE created_at >= date_trunc('month', NOW())`),
 
@@ -72,9 +72,9 @@ router.get('/', async (req, res, next) => {
       query(`SELECT COALESCE(status, 'Unspecified') AS status, COUNT(*)::int AS count
              FROM jobs ${sinceWhere} GROUP BY 1 ORDER BY count DESC`, sinceParam),
       query(`SELECT COUNT(*)::int AS v FROM jobs
-             WHERE status = 'Complete' AND closed_at >= date_trunc('month', NOW())`),
+             WHERE status = 'completed' AND closed_at >= date_trunc('month', NOW())`),
       query(`SELECT COUNT(*)::int AS v FROM jobs
-             WHERE status = 'Complete'
+             WHERE status = 'completed'
                AND closed_at >= date_trunc('month', NOW()) - INTERVAL '1 month'
                AND closed_at <  date_trunc('month', NOW())`),
       query(`SELECT COALESCE(SUM(total), 0)::float AS total_value,

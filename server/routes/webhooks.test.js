@@ -102,7 +102,7 @@ function makeFakeDb() {
       const row = insertReturning('jobs',
         ['name', 'client_id', 'address', 'scope', 'location_id', 'proposal_id'],
         params)
-      row.status = 'Scheduled'
+      row.status = 'scheduled'
       return { rows: [{ id: row.id }] }
     }
     // UPDATE integrations SET last_synced_at

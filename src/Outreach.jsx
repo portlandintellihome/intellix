@@ -242,10 +242,10 @@ function ServicePlansTab({ clients, plans, onSavePlan }) {
 }
 
 function CheckInsTab({ clients, jobs, sent, onSend }) {
-  // latest Complete job per client
+  // latest completed job per client
   const lastJobByClient = {}
   for (const j of jobs) {
-    if (j.status !== 'Complete' || !j.end_date || !j.client_id) continue
+    if (j.status !== 'completed' || !j.end_date || !j.client_id) continue
     const existing = lastJobByClient[j.client_id]
     if (!existing || new Date(j.end_date) > new Date(existing.end_date)) {
       lastJobByClient[j.client_id] = j

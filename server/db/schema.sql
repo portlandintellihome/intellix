@@ -163,7 +163,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   name TEXT NOT NULL,
   client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
   address TEXT,
-  phase TEXT,
+  phase TEXT, -- DEPRECATED: replaced by status column, retained for data history.
   status TEXT,
   priority TEXT DEFAULT 'Normal',
   scope TEXT,
@@ -194,6 +194,30 @@ UPDATE jobs SET location_id = COALESCE(
     1
   )
   WHERE location_id IS NULL;
+
+-- Status standardization: collapse the legacy free-text status/phase pair into
+-- a single canonical lifecycle on `status`. `phase` is deprecated (kept for
+-- history). NOTE: this runs AFTER the completed_at backfill above, which still
+-- keys off the legacy 'Complete' value — keep that ordering. Idempotent: a
+-- second run sees already-lowercased values and is a no-op.
+--   pending | scheduled | in_progress | completed | cancelled
+UPDATE jobs SET status = 'scheduled'   WHERE status IN ('Scheduled', 'scheduled');
+UPDATE jobs SET status = 'in_progress' WHERE status IN ('In progress', 'On site', 'Review', 'In Progress', 'in progress');
+UPDATE jobs SET status = 'completed'   WHERE status IN ('Complete', 'Completed', 'complete');
+UPDATE jobs SET status = 'cancelled'   WHERE status IN ('Cancelled', 'Canceled', 'canceled', 'cancelled');
+UPDATE jobs SET status = 'pending'     WHERE status IN ('Pending', 'pending');
+-- Any row still outside the canonical set (null/unknown status): derive from
+-- the deprecated phase value, with start_date disambiguating pending vs scheduled.
+UPDATE jobs SET status = CASE
+    WHEN phase IN ('Pending', 'Scheduling') AND start_date IS NOT NULL THEN 'scheduled'
+    WHEN phase IN ('Pending', 'Scheduling')                            THEN 'pending'
+    WHEN phase IN ('Installation', 'Programming', 'Sign-off')          THEN 'in_progress'
+    WHEN phase = 'Completed'                                           THEN 'completed'
+    WHEN phase = 'Cancelled'                                           THEN 'cancelled'
+    ELSE 'pending'
+  END
+  WHERE status IS NULL
+     OR status NOT IN ('pending', 'scheduled', 'in_progress', 'completed', 'cancelled');
 
 CREATE TABLE IF NOT EXISTS team_members (
   id SERIAL PRIMARY KEY,

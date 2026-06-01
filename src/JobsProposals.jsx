@@ -13,16 +13,20 @@ const inp = { width: '100%', background: 'var(--bg3)', border: '1px solid var(--
 const primaryBtn = { padding: '8px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#1d1d1f', color: '#fff', fontFamily: 'var(--font)' }
 const ghostBtn = { padding: '8px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontFamily: 'var(--font)' }
 
+// Proposal statuses keep their (capitalized) values; job lifecycle statuses
+// are the canonical lowercase set, each carrying a human display `label`.
 const statusStyle = {
+  // Proposals
   Draft: { bg: 'rgba(174,174,178,0.12)', color: '#6e6e73' },
   Sent: { bg: 'rgba(0,102,204,0.08)', color: '#0066cc' },
   Accepted: { bg: 'rgba(52,199,89,0.09)', color: '#248a3d' },
   Declined: { bg: 'rgba(255,59,48,0.08)', color: '#d70015' },
-  'On site': { bg: 'rgba(52,199,89,0.09)', color: '#248a3d' },
-  'In progress': { bg: 'rgba(0,102,204,0.08)', color: '#0066cc' },
-  Review: { bg: 'rgba(255,149,0,0.09)', color: '#c93400' },
-  Scheduled: { bg: 'rgba(83,74,183,0.09)', color: '#534AB7' },
-  Complete: { bg: 'rgba(52,199,89,0.09)', color: '#248a3d' },
+  // Jobs — canonical lifecycle
+  pending:     { bg: 'rgba(174,174,178,0.12)', color: '#6e6e73', label: 'Pending' },
+  scheduled:   { bg: 'rgba(83,74,183,0.09)',  color: '#534AB7', label: 'Scheduled' },
+  in_progress: { bg: 'rgba(0,102,204,0.08)',  color: '#0066cc', label: 'In progress' },
+  completed:   { bg: 'rgba(52,199,89,0.09)',  color: '#248a3d', label: 'Completed' },
+  cancelled:   { bg: 'rgba(255,59,48,0.08)',  color: '#d70015', label: 'Cancelled' },
 }
 
 function authHeaders() {
@@ -46,7 +50,7 @@ function Badge({ text }) {
   const st = statusStyle[text] || { bg: 'var(--bg4)', color: 'var(--text2)' }
   return (
     <span style={{ display: 'inline-block', padding: '3px 9px', borderRadius: 5, fontSize: 10.5, fontWeight: 700, background: st.bg, color: st.color }}>
-      {text}
+      {st.label || text}
     </span>
   )
 }
@@ -161,8 +165,7 @@ function JobModal({ initial, clients, locations, team, onClose, onSaved }) {
     location_id: initial?.location_id || null,
     address: initial?.address || '',
     scope: initial?.scope || '',
-    status: initial?.status || 'Scheduled',
-    phase: initial?.phase || 'Scheduling',
+    status: initial?.status || 'pending',
     priority: initial?.priority || 'Normal',
     start_date: initial?.start_date ? String(initial.start_date).slice(0, 10) : '',
     assigned: Array.isArray(initial?.assigned) ? initial.assigned : [],
@@ -196,7 +199,6 @@ function JobModal({ initial, clients, locations, team, onClose, onSaved }) {
         address: form.address || null,
         scope: form.scope || null,
         status: form.status,
-        phase: form.phase,
         priority: form.priority,
         start_date: form.start_date || null,
       }
@@ -248,17 +250,11 @@ function JobModal({ initial, clients, locations, team, onClose, onSaved }) {
             <div style={lbl}>Description / scope</div>
             <textarea style={{ ...inp, minHeight: 70, resize: 'vertical' }} value={form.scope} onChange={e => set('scope', e.target.value)} placeholder="Brief description of the work..." />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
               <div style={lbl}>Status</div>
               <select style={inp} value={form.status} onChange={e => set('status', e.target.value)}>
-                {['Scheduled', 'In progress', 'On site', 'Review', 'Complete'].map(o => <option key={o}>{o}</option>)}
-              </select>
-            </div>
-            <div>
-              <div style={lbl}>Phase</div>
-              <select style={inp} value={form.phase} onChange={e => set('phase', e.target.value)}>
-                {['Scheduling', 'Installation', 'Programming', 'Sign-off', 'Complete'].map(o => <option key={o}>{o}</option>)}
+                {[['pending', 'Pending'], ['scheduled', 'Scheduled'], ['in_progress', 'In progress'], ['completed', 'Completed'], ['cancelled', 'Cancelled']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <div>
@@ -690,10 +686,21 @@ export default function JobsProposals() {
     )
   }
 
-  const pendingJobs = jobs.filter(j => j.status === 'Scheduled')
-  const activeJobs = jobs.filter(j => j.status !== 'Scheduled')
-  const phaseCounts = ['Scheduling', 'Installation', 'Programming', 'Sign-off', 'Complete']
-    .map(phase => ({ phase, count: activeJobs.filter(j => j.phase === phase).length }))
+  // Not-yet-started jobs live in the "Pending" tab; everything else (active,
+  // done, cancelled) shows under "Active jobs".
+  const NOT_STARTED = ['pending', 'scheduled']
+  const pendingJobs = jobs.filter(j => NOT_STARTED.includes(j.status))
+  const activeJobs = jobs.filter(j => !NOT_STARTED.includes(j.status))
+  const completedRecently = (j) => {
+    if (j.status !== 'completed' || !j.completed_at) return false
+    return (Date.now() - new Date(j.completed_at).getTime()) <= 30 * 86400000
+  }
+  const statusCounts = [
+    { label: 'Pending', count: jobs.filter(j => j.status === 'pending').length },
+    { label: 'Scheduled', count: jobs.filter(j => j.status === 'scheduled').length },
+    { label: 'In progress', count: jobs.filter(j => j.status === 'in_progress').length },
+    { label: 'Completed (30d)', count: jobs.filter(completedRecently).length },
+  ]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
@@ -759,7 +766,7 @@ export default function JobsProposals() {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{job.name}</div>
-                      <Badge text="Scheduled" />
+                      <Badge text={job.status} />
                       <LocationBadge name={locationName(job.location_id)} />
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text3)' }}>
@@ -787,10 +794,10 @@ export default function JobsProposals() {
         {/* ACTIVE JOBS */}
         {tab === 'jobs' && (
           <div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 20 }}>
-              {phaseCounts.map(({ phase, count }) => (
-                <div key={phase} style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>{phase}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 20 }}>
+              {statusCounts.map(({ label, count }) => (
+                <div key={label} style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>{label}</div>
                   <div style={{ fontSize: 22, fontWeight: 700, color: count > 0 ? 'var(--accent)' : 'var(--text3)' }}>{count}</div>
                 </div>
               ))}
@@ -818,7 +825,6 @@ export default function JobsProposals() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {job.phase && <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text2)', background: 'var(--bg3)', padding: '3px 9px', borderRadius: 5, border: '1px solid var(--border2)' }}>{job.phase}</div>}
                       <div style={{ display: 'flex', gap: 4 }}>
                         {job.assigned.map(a => <Avatar key={a} initials={a} size={26} />)}
                       </div>

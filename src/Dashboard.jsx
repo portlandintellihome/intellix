@@ -45,6 +45,9 @@ const s = {
   teamRowLast: { display:'flex', alignItems:'center', gap:10, padding:'8px 0' },
 }
 
+// Canonical job lifecycle → display label.
+const STATUS_LABELS = { pending: 'Pending', scheduled: 'Scheduled', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' }
+
 export default function Dashboard() {
   const navigate = useNavigate()
 
@@ -82,7 +85,7 @@ export default function Dashboard() {
     })
   }, [])
 
-  const activeJobs = jobs.filter(j => j.status && j.status !== 'Complete' && j.status !== 'Scheduled')
+  const activeJobs = jobs.filter(j => j.status && !['completed', 'cancelled', 'scheduled', 'pending'].includes(j.status))
   const openTickets = tickets.filter(t => t.status !== 'Resolved')
   const availableTeam = team.filter(m => m.status === 'Available' || m.status === 'On site' || m.status === 'Remote' || m.status === 'Office')
 
@@ -144,9 +147,9 @@ export default function Dashboard() {
                 <div style={{ flex:1 }}>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                     <div style={{ fontSize:12, fontWeight:600, color:'var(--text)' }}>{j.name}</div>
-                    <span style={s.badge('var(--bg3)', 'var(--text2)')}>{j.status}</span>
+                    <span style={s.badge('var(--bg3)', 'var(--text2)')}>{STATUS_LABELS[j.status] || j.status}</span>
                   </div>
-                  <div style={{ fontSize:10.5, color:'var(--text3)', marginTop:2 }}>{j.client} · {j.phase} · {j.assigned}</div>
+                  <div style={{ fontSize:10.5, color:'var(--text3)', marginTop:2 }}>{j.client}{j.assigned ? ` · ${j.assigned}` : ''}</div>
                 </div>
               </div>
             ))}

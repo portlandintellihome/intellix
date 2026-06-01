@@ -21,9 +21,14 @@ const statusColors = {
   Inactive: { bg: 'rgba(174,174,178,0.12)', color: '#6e6e73' },
 }
 
+// Canonical job lifecycle → dot color + display label.
 const jobStatusColors = {
-  'On site': '#34c759', 'In progress': '#0066cc',
-  Review: '#ff9500', Scheduled: '#534AB7', Complete: '#aeaeb2',
+  pending: '#aeaeb2', scheduled: '#534AB7', in_progress: '#0066cc',
+  completed: '#34c759', cancelled: '#ff3b30',
+}
+const jobStatusLabels = {
+  pending: 'Pending', scheduled: 'Scheduled', in_progress: 'In progress',
+  completed: 'Completed', cancelled: 'Cancelled',
 }
 
 const lbl = { fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }
@@ -167,7 +172,7 @@ function ClientDetail({ client, onClose, locations, onLocationChanged }) {
                   <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>{job.name}</div>
                   <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 2 }}>{job.date}</div>
                 </div>
-                <span style={{ fontSize: 10.5, fontWeight: 600, color: jobStatusColors[job.status] || '#aeaeb2' }}>{job.status}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 600, color: jobStatusColors[job.status] || '#aeaeb2' }}>{jobStatusLabels[job.status] || job.status}</span>
               </div>
             ))}
           </div>
@@ -333,7 +338,7 @@ export default function Clients() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map(client => {
             const initials = client.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-            const activeJob = client.jobs.find(j => j.status !== 'Complete')
+            const activeJob = client.jobs.find(j => j.status !== 'completed')
             return (
               <div key={client.id} onClick={() => setSelected(client)} style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 11, padding: '14px 16px', cursor: 'pointer', transition: 'all 0.12s', display: 'flex', alignItems: 'center', gap: 14 }}>
                 <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{initials}</div>

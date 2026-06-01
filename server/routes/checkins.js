@@ -77,7 +77,7 @@ router.get('/due', requireInternalKey, async (_req, res, next) => {
          FROM jobs j
          JOIN clients c ON c.id = j.client_id
          LEFT JOIN locations loc ON loc.id = j.location_id
-        WHERE j.status = 'Complete'
+        WHERE j.status = 'completed'
           AND j.completed_at IS NOT NULL
           AND j.completed_at < NOW() - ($1::int * INTERVAL '1 day')
           AND j.checkin_sent_at IS NULL
