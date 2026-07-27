@@ -176,6 +176,94 @@ function CheckIns({ data, onChange }) {
   )
 }
 
+const MERGE_HINT = '{client_name} · {employee_name} · {company} · {eta} · {review_link}'
+const ta = { ...inp, minHeight: 60, resize: 'vertical', lineHeight: 1.5 }
+
+function ClientSMS({ data, onChange }) {
+  const [cfg, setCfg] = useState(null) // { configured }
+
+  useEffect(() => {
+    apiGet('/api/sms/status').then(setCfg).catch(() => setCfg({ configured: false }))
+  }, [])
+
+  const tplField = (key, label) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={lbl}>{label}</div>
+      <textarea style={ta} value={data[key] || ''} onChange={e => onChange(key, e.target.value)} />
+      <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>Merge fields: {MERGE_HINT}</div>
+    </div>
+  )
+
+  return (
+    <div style={s.card}>
+      <div style={s.cardHeader}>
+        <div>
+          <div style={s.cardHeaderTitle}>Client text messages (SMS)</div>
+          <div style={s.cardHeaderSub}>
+            Automated texts via Twilio: sent when a job is scheduled, when a tech is on the way, when a job is completed, and a review request 24h later. Clients can opt out per-record or by replying STOP.
+          </div>
+        </div>
+      </div>
+
+      {cfg && (
+        <div style={{
+          fontSize: 11.5, fontWeight: 600, marginBottom: 14, padding: '8px 12px', borderRadius: 8,
+          background: cfg.configured ? 'rgba(52,199,89,0.09)' : 'rgba(255,149,0,0.10)',
+          color: cfg.configured ? '#248a3d' : '#a85a00',
+        }}>
+          {cfg.configured
+            ? '✓ Twilio is configured — texts will send.'
+            : '⚠ Not configured — set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER. Texts still queue + log until then.'}
+        </div>
+      )}
+
+      <Toggle
+        checked={Boolean(data.sms_enabled)}
+        onChange={v => onChange('sms_enabled', v)}
+        label="Enable client SMS"
+        hint="Master switch for all four automated texts"
+      />
+
+      <div style={{ marginTop: 16 }}>
+        {tplField('sms_template_scheduled', 'Scheduled — sent when a job gets a date')}
+        {tplField('sms_template_on_the_way', 'On the way — sent when a tech taps “On the way”')}
+        {tplField('sms_template_completed', 'Completed — sent when a job is marked complete')}
+        {tplField('sms_template_review', 'Review request — sent 24h after completion')}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+        <div>
+          <div style={lbl}>Quiet hours start</div>
+          <input style={inp} type="number" min={0} max={23} value={data.sms_quiet_hours_start ?? 21} onChange={e => onChange('sms_quiet_hours_start', e.target.value === '' ? '' : Number(e.target.value))} />
+        </div>
+        <div>
+          <div style={lbl}>Quiet hours end</div>
+          <input style={inp} type="number" min={0} max={23} value={data.sms_quiet_hours_end ?? 8} onChange={e => onChange('sms_quiet_hours_end', e.target.value === '' ? '' : Number(e.target.value))} />
+        </div>
+        <div>
+          <div style={lbl}>Review delay (hours)</div>
+          <input style={inp} type="number" min={0} value={data.sms_review_delay_hours ?? 24} onChange={e => onChange('sms_review_delay_hours', e.target.value === '' ? '' : Number(e.target.value))} />
+        </div>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 14 }}>
+        No completion/review texts are sent between {data.sms_quiet_hours_start ?? 21}:00 and {data.sms_quiet_hours_end ?? 8}:00 ({data.sms_timezone || 'America/Los_Angeles'}) — they’re held until the next allowed window.
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div>
+          <div style={lbl}>Timezone (for quiet hours)</div>
+          <input style={inp} value={data.sms_timezone || 'America/Los_Angeles'} onChange={e => onChange('sms_timezone', e.target.value)} placeholder="America/Los_Angeles" />
+        </div>
+        <div>
+          <div style={lbl}>Default hourly rate ($)</div>
+          <input style={inp} type="number" min={0} step="0.01" value={data.default_hourly_rate ?? 0} onChange={e => onChange('default_hourly_rate', e.target.value === '' ? '' : Number(e.target.value))} />
+          <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>Feeds labor cost per job in Reporting.</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function LocationModal({ initial, onClose, onSaved }) {
   const isEdit = Boolean(initial?.id)
   const [form, setForm] = useState({
@@ -551,6 +639,9 @@ export default function Settings() {
 
           <div style={s.sectionTitle}>Check-ins</div>
           <CheckIns data={data} onChange={set} />
+
+          <div style={s.sectionTitle}>Text messages</div>
+          <ClientSMS data={data} onChange={set} />
 
           <div style={s.sectionTitle}>Notifications</div>
           <Notifications data={data} onChange={set} />

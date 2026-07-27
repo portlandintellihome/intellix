@@ -4,6 +4,15 @@ import { generateCheckinEmail } from '../services/aiProcessor.js'
 
 const router = Router()
 
+// SMS template defaults mirror schema.sql so a first-time settings insert can't
+// null them out if the client didn't send them.
+const SMS_DEFAULTS = {
+  sms_template_scheduled: "Hi {client_name}, this is {company}. Your service visit is scheduled. We'll see you then!",
+  sms_template_on_the_way: 'Hi {client_name}, {employee_name} from {company} is on the way{eta}. See you soon!',
+  sms_template_completed: 'Hi {client_name}, your service with {company} is complete. Thank you — reach out any time if you need anything.',
+  sms_template_review: 'Hi {client_name}, thanks again for choosing {company}! If you were happy with our work, a quick review means a lot: {review_link}',
+}
+
 const DEFAULTS = {
   company_name: '',
   company_address: '',
@@ -16,6 +25,19 @@ const DEFAULTS = {
   checkin_email_body: '',
   email_notifications: true,
   in_app_notifications: true,
+  sms_enabled: false,
+  ...SMS_DEFAULTS,
+  sms_quiet_hours_start: 21,
+  sms_quiet_hours_end: 8,
+  sms_review_delay_hours: 24,
+  sms_timezone: 'America/Los_Angeles',
+  default_hourly_rate: 0,
+}
+
+// Clamp an hour-of-day (0-23) with a fallback.
+function hour(v, fallback) {
+  const n = Number(v)
+  return Number.isFinite(n) && n >= 0 && n <= 23 ? Math.floor(n) : fallback
 }
 
 router.get('/', async (_req, res, next) => {
@@ -41,6 +63,18 @@ router.post('/', async (req, res, next) => {
       checkin_tone: body.checkin_tone === 'professional' ? 'professional' : 'warm',
       email_notifications: Boolean(body.email_notifications),
       in_app_notifications: Boolean(body.in_app_notifications),
+      // SMS config. Template strings preserve the current DB value when the
+      // client omits them (falls back to defaults on first insert).
+      sms_enabled: Boolean(body.sms_enabled),
+      sms_template_scheduled: typeof body.sms_template_scheduled === 'string' ? body.sms_template_scheduled : SMS_DEFAULTS.sms_template_scheduled,
+      sms_template_on_the_way: typeof body.sms_template_on_the_way === 'string' ? body.sms_template_on_the_way : SMS_DEFAULTS.sms_template_on_the_way,
+      sms_template_completed: typeof body.sms_template_completed === 'string' ? body.sms_template_completed : SMS_DEFAULTS.sms_template_completed,
+      sms_template_review: typeof body.sms_template_review === 'string' ? body.sms_template_review : SMS_DEFAULTS.sms_template_review,
+      sms_quiet_hours_start: hour(body.sms_quiet_hours_start, 21),
+      sms_quiet_hours_end: hour(body.sms_quiet_hours_end, 8),
+      sms_review_delay_hours: Number.isFinite(Number(body.sms_review_delay_hours)) && Number(body.sms_review_delay_hours) >= 0 ? Math.floor(Number(body.sms_review_delay_hours)) : 24,
+      sms_timezone: typeof body.sms_timezone === 'string' && body.sms_timezone.trim() ? body.sms_timezone.trim() : 'America/Los_Angeles',
+      default_hourly_rate: Number.isFinite(Number(body.default_hourly_rate)) && Number(body.default_hourly_rate) >= 0 ? Number(body.default_hourly_rate) : 0,
     }
 
     // checkin_email_subject/body are DEPRECATED (AI-generated now) and no
@@ -50,8 +84,13 @@ router.post('/', async (req, res, next) => {
       `INSERT INTO settings (id, company_name, company_address, company_phone, company_email,
                              company_logo_url,
                              checkin_delay_days, checkin_tone,
-                             email_notifications, in_app_notifications, updated_at)
-       VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+                             email_notifications, in_app_notifications,
+                             sms_enabled, sms_template_scheduled, sms_template_on_the_way,
+                             sms_template_completed, sms_template_review,
+                             sms_quiet_hours_start, sms_quiet_hours_end,
+                             sms_review_delay_hours, sms_timezone, default_hourly_rate, updated_at)
+       VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9,
+               $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW())
        ON CONFLICT (id) DO UPDATE SET
          company_name = EXCLUDED.company_name,
          company_address = EXCLUDED.company_address,
@@ -62,6 +101,16 @@ router.post('/', async (req, res, next) => {
          checkin_tone = EXCLUDED.checkin_tone,
          email_notifications = EXCLUDED.email_notifications,
          in_app_notifications = EXCLUDED.in_app_notifications,
+         sms_enabled = EXCLUDED.sms_enabled,
+         sms_template_scheduled = EXCLUDED.sms_template_scheduled,
+         sms_template_on_the_way = EXCLUDED.sms_template_on_the_way,
+         sms_template_completed = EXCLUDED.sms_template_completed,
+         sms_template_review = EXCLUDED.sms_template_review,
+         sms_quiet_hours_start = EXCLUDED.sms_quiet_hours_start,
+         sms_quiet_hours_end = EXCLUDED.sms_quiet_hours_end,
+         sms_review_delay_hours = EXCLUDED.sms_review_delay_hours,
+         sms_timezone = EXCLUDED.sms_timezone,
+         default_hourly_rate = EXCLUDED.default_hourly_rate,
          updated_at = NOW()
        RETURNING *`,
       [
@@ -69,6 +118,10 @@ router.post('/', async (req, res, next) => {
         data.company_logo_url,
         data.checkin_delay_days, data.checkin_tone,
         data.email_notifications, data.in_app_notifications,
+        data.sms_enabled, data.sms_template_scheduled, data.sms_template_on_the_way,
+        data.sms_template_completed, data.sms_template_review,
+        data.sms_quiet_hours_start, data.sms_quiet_hours_end,
+        data.sms_review_delay_hours, data.sms_timezone, data.default_hourly_rate,
       ]
     )
     res.json(rows[0])

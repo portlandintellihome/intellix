@@ -26,4 +26,13 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  // Backend + Node tooling run under Node, not the browser — give them Node
+  // globals (process, Buffer, console, __dirname, …) so they aren't flagged
+  // no-undef. Without this every server file's `process.env` reads as an error.
+  {
+    files: ['server/**/*.js', 'scripts/**/*.{js,mjs}', '*.config.js', 'capacitor.config.ts'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ])

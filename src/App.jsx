@@ -14,6 +14,7 @@ import ResetPassword from './ResetPassword'
 import { useIsMobile } from './lib/useIsMobile'
 import { initToken, getToken, authHeader, clearToken } from './lib/auth'
 import * as haptics from './lib/haptics'
+import ClockInControl from './ClockInControl'
 
 const Dashboard = lazy(() => import('./Dashboard'))
 const JobsProposals = lazy(() => import('./JobsProposals'))
@@ -194,7 +195,7 @@ function AppShell({ user, dark, setDark, logout }) {
             <Menu size={22} strokeWidth={2} />
           </button>
           <IntellixLogo dark={dark} compact />
-          <div style={{ width: 44 }} />
+          <ClockInControl variant="mobile" />
         </div>
       )}
 
@@ -265,6 +266,12 @@ function AppShell({ user, dark, setDark, logout }) {
             )
           })}
         </nav>
+
+        {!isMobile && (
+          <div style={{ padding: '10px 12px 0' }}>
+            <ClockInControl variant="desktop" />
+          </div>
+        )}
 
         <div style={{
           padding: 12, borderTop: '1px solid var(--border2)',

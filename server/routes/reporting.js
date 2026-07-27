@@ -27,6 +27,8 @@ router.get('/', async (req, res, next) => {
   const sinceParam = since ? [since] : []
   const sinceWhere = since ? 'WHERE created_at >= $1' : ''
   const sinceAnd = since ? 'AND created_at >= $1' : ''
+  // time_entries range filter keys off the punch-in time, not created_at.
+  const teWhere = since ? 'WHERE te.clock_in_at >= $1' : ''
 
   console.log('[reporting] request', { range, since: since?.toISOString() })
 
@@ -61,6 +63,12 @@ router.get('/', async (req, res, next) => {
 
       // Revenue trend (always last 6 months)
       revenueByMonth,
+
+      // Labor / time-on-site (from time_entries)
+      laborByJob,
+      laborTotals,
+      utilizationByMember,
+      hourlyRateRow,
     ] = await Promise.all([
       query(`SELECT COALESCE(SUM(total), 0)::float AS v FROM proposals
              WHERE status = 'Accepted' AND created_at >= date_trunc('month', NOW())`),
@@ -122,7 +130,41 @@ router.get('/', async (req, res, next) => {
                AND created_at >= date_trunc('month', NOW()) - INTERVAL '5 months'
              GROUP BY 1
              ORDER BY 1`),
+
+      // Per-job actual on-site hours (open punches counted up to NOW) vs estimate.
+      query(`SELECT j.id, j.name,
+                    j.estimated_hours::float AS estimated_hours,
+                    COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(te.clock_out_at, NOW()) - te.clock_in_at)) / 3600), 0)::float AS actual_hours
+             FROM time_entries te
+             JOIN jobs j ON j.id = te.job_id
+             ${teWhere}
+             GROUP BY j.id, j.name, j.estimated_hours
+             HAVING COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(te.clock_out_at, NOW()) - te.clock_in_at)) / 3600), 0) > 0
+             ORDER BY actual_hours DESC
+             LIMIT 25`, sinceParam),
+      query(`SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(te.clock_out_at, NOW()) - te.clock_in_at)) / 3600), 0)::float AS total_hours,
+                    COUNT(*) FILTER (WHERE te.clock_out_at IS NULL)::int AS open_punches
+             FROM time_entries te ${teWhere}`, sinceParam),
+      query(`SELECT tm.name, tm.initials,
+                    COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(te.clock_out_at, NOW()) - te.clock_in_at)) / 3600), 0)::float AS hours
+             FROM time_entries te
+             JOIN team_members tm ON tm.id = te.employee_id
+             ${teWhere}
+             GROUP BY tm.id, tm.name, tm.initials
+             HAVING COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(te.clock_out_at, NOW()) - te.clock_in_at)) / 3600), 0) > 0
+             ORDER BY hours DESC`, sinceParam),
+      query(`SELECT COALESCE(default_hourly_rate, 0)::float AS rate FROM settings WHERE id = 1`),
     ])
+
+    const hourlyRate = num(hourlyRateRow.rows[0]?.rate)
+    const laborJobs = laborByJob.rows.map(j => ({
+      job_id: j.id,
+      name: j.name,
+      actual_hours: num(j.actual_hours),
+      estimated_hours: j.estimated_hours == null ? null : num(j.estimated_hours),
+      cost: num(j.actual_hours) * hourlyRate,
+    }))
+    const totalHours = num(laborTotals.rows[0]?.total_hours)
 
     res.json({
       range,
@@ -158,6 +200,16 @@ router.get('/', async (req, res, next) => {
       },
       revenue: {
         by_month: revenueByMonth.rows,
+      },
+      labor: {
+        hourly_rate: hourlyRate,
+        total_hours: totalHours,
+        total_cost: totalHours * hourlyRate,
+        open_punches: num(laborTotals.rows[0]?.open_punches),
+        by_job: laborJobs,
+        utilization_by_member: utilizationByMember.rows.map(m => ({
+          name: m.name, initials: m.initials, hours: num(m.hours),
+        })),
       },
     })
   } catch (err) {

@@ -25,6 +25,8 @@ import todosRouter from './routes/todos.js'
 import integrationsRouter from './routes/integrations.js'
 import webhooksRouter from './routes/webhooks.js'
 import homedocsRouter from './routes/homedocs.js'
+import timeEntriesRouter from './routes/time-entries.js'
+import smsRouter from './routes/sms.js'
 import { migrate } from './db/migrate.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -62,6 +64,8 @@ app.use('/api/todos', todosRouter)
 app.use('/api/integrations', integrationsRouter)
 app.use('/api/webhooks', webhooksRouter)
 app.use('/api/homedocs', homedocsRouter)
+app.use('/api/time-entries', timeEntriesRouter)
+app.use('/api/sms', smsRouter)
 
 // Public read-only access to uploaded photos (job photos live under
 // /uploads/jobs). UPLOAD_DIR is the Railway volume mount; the static mount

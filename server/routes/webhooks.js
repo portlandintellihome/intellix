@@ -3,7 +3,7 @@
 // per-integration secret in the URL path, which is generated server-side
 // and only ever delivered through the admin UI.
 
-import { Router } from 'express'
+import { Router, urlencoded } from 'express'
 import { query } from '../db.js'
 
 const router = Router()
@@ -271,6 +271,53 @@ router.post('/portal-io/contact/:secret', asyncRoute(async (req, res) => {
   console.log('[webhook] portal_io contact', { portal_contact_id: req.body?.portal_contact_id })
   const result = await handleContactSync(req.body, integration)
   res.json(result)
+}))
+
+// --- Twilio inbound (STOP/START opt-out handling) ---------------------------
+// Twilio posts application/x-www-form-urlencoded, so this route parses its own
+// body (index.js only registers express.json()). Secret is the 'twilio'
+// integration secret in the URL path, matching the portal_io pattern. Twilio
+// also auto-handles STOP at the carrier level; we honor it in-app so the review
+// request (the most promotional of the four) is reliably suppressed.
+const twilioBody = urlencoded({ extended: false })
+const STOP_WORDS = new Set(['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT', 'REVOKE'])
+const START_WORDS = new Set(['START', 'YES', 'UNSTOP'])
+
+function twiml(res) {
+  res.set('Content-Type', 'text/xml')
+    .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>')
+}
+
+router.post('/twilio/inbound/:secret', twilioBody, asyncRoute(async (req, res) => {
+  await validatedIntegration('twilio', req.params.secret)
+  const from = String(req.body?.From || '')
+  const bodyText = String(req.body?.Body || '').trim().toUpperCase()
+  const last10 = from.replace(/\D/g, '').slice(-10)
+  let action = 'none'
+
+  if (last10 && STOP_WORDS.has(bodyText)) {
+    // Match any client whose stored phone ends in the same 10 digits.
+    const upd = await query(
+      `UPDATE clients SET sms_opt_out = TRUE, sms_opt_out_at = NOW()
+         WHERE regexp_replace(COALESCE(phone, ''), '\\D', '', 'g') LIKE '%' || $1
+         RETURNING id`, [last10])
+    if (upd.rows.length) {
+      const ids = upd.rows.map(r => r.id)
+      await query(
+        `UPDATE sms_messages SET status = 'canceled', error = 'client opted out (STOP)'
+           WHERE client_id = ANY($1) AND status = 'queued'`, [ids])
+    }
+    action = `opted_out:${upd.rows.length}`
+  } else if (last10 && START_WORDS.has(bodyText)) {
+    const upd = await query(
+      `UPDATE clients SET sms_opt_out = FALSE, sms_opt_out_at = NULL
+         WHERE regexp_replace(COALESCE(phone, ''), '\\D', '', 'g') LIKE '%' || $1
+         RETURNING id`, [last10])
+    action = `opted_in:${upd.rows.length}`
+  }
+
+  console.log('[webhook] twilio inbound', { from, body: bodyText.slice(0, 40), action })
+  twiml(res)
 }))
 
 export default router

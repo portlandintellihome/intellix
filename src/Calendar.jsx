@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiGet } from './lib/api'
+import { getToken } from './lib/auth'
 import { colorForInitials } from './lib/color'
 import { useIsMobile } from './lib/useIsMobile'
 
@@ -18,6 +19,24 @@ function getFirstDayOfMonth(month, year) {
   return new Date(year, month, 1).getDay()
 }
 
+function mapJobs(jobRows) {
+  return jobRows.map(j => {
+    const s = j.start_date ? new Date(j.start_date) : null
+    const e = j.end_date ? new Date(j.end_date) : null
+    const assigned = Array.isArray(j.assigned) ? j.assigned : []
+    return {
+      ...j,
+      start: s ? { month: s.getMonth(), day: s.getDate() } : null,
+      end: e ? { month: e.getMonth(), day: e.getDate() } : null,
+      client: j.client_name || '',
+      assigned,
+      color: colorForInitials(assigned[0]) || PALETTE[0],
+      portalId: j.portal_id || '',
+      clientId: j.client_id,
+    }
+  }).filter(j => j.start && j.end)
+}
+
 function jobOnDay(job, day, month) {
   const startBefore = job.start.month < month || (job.start.month === month && job.start.day <= day)
   const endAfter = job.end.month > month || (job.end.month === month && job.end.day >= day)
@@ -32,12 +51,53 @@ function Avatar({ initials, size = 20 }) {
   )
 }
 
-function NewJobModal({ onClose, selectedDate, team }) {
+function NewJobModal({ onClose, selectedDate, team, onCreated }) {
   const [form, setForm] = useState({ name: '', client: '', start: selectedDate || '', end: '', assigned: [], notes: '' })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const toggleAssign = (i) => setForm(f => ({ ...f, assigned: f.assigned.includes(i) ? f.assigned.filter(a => a !== i) : [...f.assigned, i] }))
   const inp = { width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 11px', fontSize: 12.5, color: 'var(--text)', fontFamily: 'var(--font)', outline: 'none' }
   const lbl = { fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }
+
+  const canSubmit = form.name.trim() && form.start && !saving
+
+  const submit = async () => {
+    if (!canSubmit) return
+    setSaving(true); setError('')
+    try {
+      const base = import.meta.env.VITE_API_URL || ''
+      const token = getToken()
+      const res = await fetch(`${base}/api/jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          start_date: form.start,
+          end_date: form.end || form.start,
+          scope: form.notes || null,
+          status: 'scheduled',
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`)
+      // Fire the "Scheduled" SMS (best-effort — only sends if the job has a
+      // client with a phone; a free-text client name won't, and that's fine).
+      if (data.id && token) {
+        fetch(`${base}/api/sms/scheduled`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ job_id: data.id }),
+        }).catch(() => {})
+      }
+      onCreated?.()
+      onClose()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 14, width: 480, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }}>
@@ -87,9 +147,10 @@ function NewJobModal({ onClose, selectedDate, team }) {
             <textarea style={{ ...inp, minHeight: 60, resize: 'vertical' }} placeholder="Any scheduling notes..." value={form.notes} onChange={e => set('notes', e.target.value)} />
           </div>
         </div>
-        <div style={{ padding: '14px 22px', borderTop: '1px solid var(--border2)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div style={{ padding: '14px 22px', borderTop: '1px solid var(--border2)', display: 'flex', justifyContent: 'flex-end', gap: 8, alignItems: 'center' }}>
+          {error && <span style={{ fontSize: 11.5, color: '#d70015', fontWeight: 600, marginRight: 'auto' }}>{error}</span>}
           <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontFamily: 'var(--font)' }}>Cancel</button>
-          <button style={{ padding: '8px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#1d1d1f', color: '#fff', fontFamily: 'var(--font)' }}>Schedule job</button>
+          <button onClick={submit} disabled={!canSubmit} style={{ padding: '8px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: canSubmit ? 'pointer' : 'not-allowed', border: 'none', background: '#1d1d1f', color: '#fff', fontFamily: 'var(--font)', opacity: canSubmit ? 1 : 0.5 }}>{saving ? 'Scheduling…' : 'Schedule job'}</button>
         </div>
       </div>
     </div>
@@ -110,26 +171,24 @@ export default function CalendarPage() {
   const [jobs, setJobs] = useState([])
   const [team, setTeam] = useState([])
 
+  const reload = () => {
+    Promise.all([
+      apiGet('/api/jobs').catch(() => []),
+      apiGet('/api/team').catch(() => []),
+    ]).then(([jobRows, teamRows]) => {
+      setJobs(mapJobs(jobRows))
+      setTeam(teamRows)
+    })
+  }
+
+  // Mount load kept inline (not calling reload) so react-hooks doesn't flag a
+  // setState-containing function called from the effect.
   useEffect(() => {
     Promise.all([
       apiGet('/api/jobs').catch(() => []),
       apiGet('/api/team').catch(() => []),
     ]).then(([jobRows, teamRows]) => {
-      setJobs(jobRows.map(j => {
-        const s = j.start_date ? new Date(j.start_date) : null
-        const e = j.end_date ? new Date(j.end_date) : null
-        const assigned = Array.isArray(j.assigned) ? j.assigned : []
-        return {
-          ...j,
-          start: s ? { month: s.getMonth(), day: s.getDate() } : null,
-          end: e ? { month: e.getMonth(), day: e.getDate() } : null,
-          client: j.client_name || '',
-          assigned,
-          color: colorForInitials(assigned[0]) || PALETTE[0],
-          portalId: j.portal_id || '',
-          clientId: j.client_id,
-        }
-      }).filter(j => j.start && j.end))
+      setJobs(mapJobs(jobRows))
       setTeam(teamRows)
     })
   }, [])
@@ -163,7 +222,7 @@ export default function CalendarPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-      {showNew && <NewJobModal onClose={() => setShowNew(false)} selectedDate={selectedDate} team={team} />}
+      {showNew && <NewJobModal onClose={() => setShowNew(false)} selectedDate={selectedDate} team={team} onCreated={reload} />}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '10px 14px' : '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 16, minWidth: 0 }}>

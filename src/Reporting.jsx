@@ -290,6 +290,55 @@ export default function Reporting() {
               </div>
             </div>
 
+            {data.labor && (
+              <>
+                <div style={{ ...s.kpiGrid, marginTop: 16 }}>
+                  <KpiCard label="On-site hours" value={`${(data.labor.total_hours || 0).toFixed(1)}h`} sub="clocked in this range" color="#0066cc" />
+                  <KpiCard label="Labor cost" value={fmtMoney(data.labor.total_cost)} sub={`@ ${fmtMoney(data.labor.hourly_rate)}/hr`} color="#34c759" />
+                  <KpiCard label="Open punches" value={fmtNumber(data.labor.open_punches)} sub="currently clocked in" color="#ff9500" />
+                </div>
+
+                <div style={s.twoCol}>
+                  <div style={s.card}>
+                    <div style={s.cardTitle}>Time on site vs estimate — by job</div>
+                    {(!data.labor.by_job || data.labor.by_job.length === 0) ? (
+                      <div style={s.empty}>No time logged against jobs in this range.</div>
+                    ) : (
+                      <div>
+                        {data.labor.by_job.map(j => (
+                          <div key={j.job_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border2)' }}>
+                            <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.name}</div>
+                            <div style={{ fontSize: 11.5, color: 'var(--text2)', flexShrink: 0 }}>
+                              {j.actual_hours.toFixed(1)}h
+                              <span style={{ color: 'var(--text3)' }}> / {j.estimated_hours != null ? `${j.estimated_hours.toFixed(1)}h est` : 'no est'}</span>
+                            </div>
+                            <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)', flexShrink: 0, width: 64, textAlign: 'right' }}>{fmtMoney(j.cost)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={s.card}>
+                    <div style={s.cardTitle}>Utilization — hours per tech</div>
+                    {(!data.labor.utilization_by_member || data.labor.utilization_by_member.length === 0) ? (
+                      <div style={s.empty}>No time logged in this range.</div>
+                    ) : (
+                      <div>
+                        {data.labor.utilization_by_member.map(m => (
+                          <div key={m.initials || m.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border2)' }}>
+                            <div style={{ width: 26, height: 26, minWidth: 26, borderRadius: '50%', background: colorForInitials(m.initials || m.name), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10.5, fontWeight: 700 }}>{m.initials || (m.name || '?').slice(0, 2).toUpperCase()}</div>
+                            <div style={{ flex: 1, fontSize: 12, color: 'var(--text)' }}>{m.name || m.initials}</div>
+                            <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>{m.hours.toFixed(1)}h</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
             {data.team.tickets_resolved_per_member.length > 0 && (
               <div style={{ ...s.card, marginTop: 12 }}>
                 <div style={s.cardTitle}>Team — tickets resolved</div>

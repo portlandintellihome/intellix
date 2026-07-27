@@ -5,6 +5,7 @@ import { Router } from 'express'
 import multer from 'multer'
 import { query as defaultQuery } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
+import { onJobCompleted } from '../services/sms.js'
 
 // Job photos share the same /uploads volume as support photos, in a jobs/
 // subdirectory. Resolution mirrors support.js so the static mount in
@@ -140,6 +141,15 @@ export function makeRouter(query = defaultQuery) {
         values,
       )
       res.json(rows[0])
+
+      // On the genuine transition into 'completed', fire the completed SMS now
+      // (quiet-hours aware) and schedule the delayed review text. Fire-and-forget
+      // AFTER the response so it can never affect the HTTP result; fully caught
+      // so a trigger failure can't crash the process.
+      if (becomingComplete) {
+        onJobCompleted(query, req.params.id).catch(err =>
+          console.error('[jobs] completed SMS trigger failed', { job_id: req.params.id, error: err?.message }))
+      }
     } catch (err) { next(err) }
   })
 

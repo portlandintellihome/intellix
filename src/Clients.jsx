@@ -79,12 +79,45 @@ function NewClientModal({ onClose }) {
   )
 }
 
+const SMS_LABELS = { scheduled: 'Scheduled', on_the_way: 'On the way', completed: 'Completed', review: 'Review request' }
+const SMS_STATUS = {
+  sent: { bg: 'rgba(52,199,89,0.09)', color: '#248a3d' },
+  queued: { bg: 'var(--bg4)', color: 'var(--text2)' },
+  skipped: { bg: 'rgba(255,149,0,0.10)', color: '#a85a00' },
+  failed: { bg: 'rgba(255,59,48,0.08)', color: '#d70015' },
+  canceled: { bg: 'rgba(255,59,48,0.08)', color: '#d70015' },
+}
+
 function ClientDetail({ client, onClose, locations, onLocationChanged }) {
   const [editingNotes, setEditingNotes] = useState(false)
   const [notes, setNotes] = useState(client.notes)
   const [locationId, setLocationId] = useState(client.location_id || '')
   const [savingLocation, setSavingLocation] = useState(false)
+  const [smsOptOut, setSmsOptOut] = useState(Boolean(client.sms_opt_out))
+  const [smsBusy, setSmsBusy] = useState(false)
+  const [texts, setTexts] = useState(null)
   const initials = client.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+
+  useEffect(() => {
+    apiGet(`/api/clients/${client.id}/sms`).then(setTexts).catch(() => setTexts([]))
+  }, [client.id])
+
+  const toggleSms = async () => {
+    const next = !smsOptOut
+    setSmsOptOut(next); setSmsBusy(true)
+    haptics.light()
+    try {
+      const base = import.meta.env.VITE_API_URL || ''
+      const token = getToken()
+      const res = await fetch(`${base}/api/clients/${client.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ sms_opt_out: next }),
+      })
+      if (res.ok) { const updated = await res.json(); onLocationChanged?.(updated) }
+      else setSmsOptOut(!next)
+    } catch { setSmsOptOut(!next) } finally { setSmsBusy(false) }
+  }
 
   const updateLocation = async (newId) => {
     setLocationId(newId)
@@ -160,6 +193,16 @@ function ClientDetail({ client, onClose, locations, onLocationChanged }) {
                 </select>
                 {savingLocation && <span style={{ marginLeft: 10, fontSize: 11, color: 'var(--text3)' }}>Saving…</span>}
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderTop: '1px solid var(--border2)' }}>
+                <div style={{ width: 70, fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Texting</div>
+                <div style={{ flex: 1, fontSize: 12.5, color: 'var(--text)' }}>{smsOptOut ? 'Opted out of SMS' : 'Texting enabled'}</div>
+                <button
+                  type="button" role="switch" aria-checked={!smsOptOut} onClick={toggleSms} disabled={smsBusy}
+                  style={{ width: 42, height: 24, borderRadius: 12, border: 'none', padding: 0, background: smsOptOut ? 'var(--bg4)' : 'var(--accent)', cursor: smsBusy ? 'wait' : 'pointer', position: 'relative', flexShrink: 0, opacity: smsBusy ? 0.6 : 1 }}
+                >
+                  <span style={{ position: 'absolute', top: 2, left: smsOptOut ? 2 : 20, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -192,6 +235,26 @@ function ClientDetail({ client, onClose, locations, onLocationChanged }) {
                 <a href="https://portal.io" target="_blank" rel="noreferrer" style={{ fontSize: 10.5, color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>Portal ↗</a>
               </div>
             ))}
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>Text messages</div>
+            {texts == null && <div style={{ fontSize: 11.5, color: 'var(--text3)' }}>Loading…</div>}
+            {texts != null && texts.length === 0 && <div style={{ fontSize: 11.5, color: 'var(--text3)' }}>No texts sent to this client yet.</div>}
+            {texts != null && texts.map(t => {
+              const st = SMS_STATUS[t.status] || SMS_STATUS.queued
+              return (
+                <div key={t.id} style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 9, padding: '10px 14px', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)' }}>{SMS_LABELS[t.template_key] || t.template_key}</span>
+                    <span style={{ padding: '1px 7px', borderRadius: 4, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3px', background: st.bg, color: st.color }}>{t.status}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text3)' }}>{new Date(t.sent_at || t.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text2)', lineHeight: 1.5 }}>{t.body}</div>
+                  {t.error && <div style={{ fontSize: 10.5, color: '#d70015', marginTop: 4 }}>{t.error}</div>}
+                </div>
+              )
+            })}
           </div>
 
           <div>
@@ -262,8 +325,9 @@ export default function Clients() {
   const ptr = usePullToRefresh(loadClients)
 
   const onClientLocationChanged = (updated) => {
-    setClients(cs => cs.map(c => c.id === updated.id ? { ...c, location_id: updated.location_id } : c))
-    setSelected(s => s && s.id === updated.id ? { ...s, location_id: updated.location_id } : s)
+    const patch = { location_id: updated.location_id, sms_opt_out: updated.sms_opt_out }
+    setClients(cs => cs.map(c => c.id === updated.id ? { ...c, ...patch } : c))
+    setSelected(s => s && s.id === updated.id ? { ...s, ...patch } : s)
   }
 
   useEffect(() => {

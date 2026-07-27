@@ -482,3 +482,126 @@ ALTER TABLE checkin_emails_sent ADD COLUMN IF NOT EXISTS subject TEXT;
 ALTER TABLE checkin_emails_sent ADD COLUMN IF NOT EXISTS html_body TEXT;
 ALTER TABLE checkin_emails_sent ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ DEFAULT NOW();
 CREATE INDEX IF NOT EXISTS idx_checkin_emails_sent_job ON checkin_emails_sent (job_id, sent_at DESC);
+
+-- ============================================================================
+-- FEATURE: Employee clock-in / job-linked time tracking (time_entries)
+-- ----------------------------------------------------------------------------
+-- One row per punch. employee_id references team_members(id) — that's the team
+-- roster. The authenticated user (users row) is mapped to their team_member at
+-- clock-in time (by email, then initials, auto-provisioned if absent). The
+-- calendar auto-suggest matches team_members.initials against jobs.assigned.
+-- A punch is "open" while clock_out_at IS NULL. edited_by_user_id records the
+-- Admin (users row) who corrected an entry — only Admins may edit past entries.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS time_entries (
+  id SERIAL PRIMARY KEY,
+  employee_id INTEGER NOT NULL REFERENCES team_members(id) ON DELETE CASCADE,
+  job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+  clock_in_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  clock_out_at TIMESTAMPTZ,
+  note TEXT,
+  edited_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+-- Idempotent ALTERs so every declared column also lands on an existing DB
+-- (CREATE TABLE IF NOT EXISTS is a no-op there) and verifySchema() covers them.
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS employee_id INTEGER REFERENCES team_members(id) ON DELETE CASCADE;
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL;
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS clock_in_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS clock_out_at TIMESTAMPTZ;
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS note TEXT;
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS edited_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+CREATE INDEX IF NOT EXISTS idx_time_entries_employee ON time_entries (employee_id, clock_in_at DESC);
+CREATE INDEX IF NOT EXISTS idx_time_entries_job ON time_entries (job_id);
+-- Partial index for the hot "is this employee currently clocked in?" lookup.
+CREATE INDEX IF NOT EXISTS idx_time_entries_open ON time_entries (employee_id) WHERE clock_out_at IS NULL;
+
+-- Optional per-job estimate so Reporting can show actual-vs-estimated on-site
+-- time. NULL when unset (no estimate to compare against).
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS estimated_hours NUMERIC(8,2);
+
+-- ============================================================================
+-- FEATURE: Client SMS system (Twilio) — templates, quiet hours, opt-out, audit
+-- ----------------------------------------------------------------------------
+-- Settings gains the 4 editable templates + quiet-hours + review-delay config.
+-- Merge fields supported by the sender: {client_name} {employee_name}
+-- {company} {eta} {review_link}. Quiet hours are expressed as local-hour
+-- integers in sms_timezone; completion/review texts falling in the quiet
+-- window are deferred to sms_quiet_hours_end.
+-- ============================================================================
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sms_enabled BOOLEAN DEFAULT FALSE;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sms_template_scheduled TEXT
+  DEFAULT 'Hi {client_name}, this is {company}. Your service visit is scheduled. We''ll see you then!';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sms_template_on_the_way TEXT
+  DEFAULT 'Hi {client_name}, {employee_name} from {company} is on the way{eta}. See you soon!';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sms_template_completed TEXT
+  DEFAULT 'Hi {client_name}, your service with {company} is complete. Thank you — reach out any time if you need anything.';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sms_template_review TEXT
+  DEFAULT 'Hi {client_name}, thanks again for choosing {company}! If you were happy with our work, a quick review means a lot: {review_link}';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sms_quiet_hours_start INTEGER DEFAULT 21;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sms_quiet_hours_end INTEGER DEFAULT 8;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sms_review_delay_hours INTEGER DEFAULT 24;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sms_timezone TEXT DEFAULT 'America/Los_Angeles';
+
+-- Per-client SMS consent + import-provenance columns. sms_opt_out is the
+-- guardrail the STOP webhook flips; source_id makes the CSV import idempotent.
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS sms_opt_out BOOLEAN DEFAULT FALSE;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS sms_opt_out_at TIMESTAMPTZ;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS source_id TEXT;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS source_system TEXT;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS company TEXT;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS lead_source TEXT;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS customer_type TEXT;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS lifetime_value NUMERIC(12,2);
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS last_service_date DATE;
+-- Full-fidelity snapshot of the source row (extra phones/emails/addresses,
+-- flags) so nothing from the import is lost even though only a few fields are
+-- promoted to first-class columns.
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS source_meta JSONB DEFAULT '{}';
+-- Idempotency guard for the importer: source_id is unique when present.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_source_id ON clients (source_id) WHERE source_id IS NOT NULL;
+
+-- Outbox + audit trail for every SMS. Doubles as the deferred-send queue:
+-- send_after gates the 24h review delay and quiet-hours deferral; an external
+-- cron polls GET /api/sms/process-due to flush anything now due. status:
+-- queued | sent | failed | skipped | canceled. template_key: scheduled |
+-- on_the_way | completed | review.
+CREATE TABLE IF NOT EXISTS sms_messages (
+  id SERIAL PRIMARY KEY,
+  client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+  job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+  template_key TEXT,
+  to_number TEXT,
+  body TEXT,
+  status TEXT DEFAULT 'queued',
+  error TEXT,
+  twilio_sid TEXT,
+  send_after TIMESTAMPTZ DEFAULT NOW(),
+  sent_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE sms_messages ADD COLUMN IF NOT EXISTS client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE;
+ALTER TABLE sms_messages ADD COLUMN IF NOT EXISTS job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL;
+ALTER TABLE sms_messages ADD COLUMN IF NOT EXISTS template_key TEXT;
+ALTER TABLE sms_messages ADD COLUMN IF NOT EXISTS to_number TEXT;
+ALTER TABLE sms_messages ADD COLUMN IF NOT EXISTS body TEXT;
+ALTER TABLE sms_messages ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'queued';
+ALTER TABLE sms_messages ADD COLUMN IF NOT EXISTS error TEXT;
+ALTER TABLE sms_messages ADD COLUMN IF NOT EXISTS twilio_sid TEXT;
+ALTER TABLE sms_messages ADD COLUMN IF NOT EXISTS send_after TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE sms_messages ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ;
+ALTER TABLE sms_messages ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+CREATE INDEX IF NOT EXISTS idx_sms_messages_client ON sms_messages (client_id, created_at DESC);
+-- Partial index for the cron's "what's due to send now?" scan.
+CREATE INDEX IF NOT EXISTS idx_sms_messages_due ON sms_messages (send_after) WHERE status = 'queued';
+
+-- Twilio inbound-webhook secret (STOP handling), seeded like portal_io. The
+-- secret is a URL path segment the webhook must include; shown only in the
+-- admin Integrations UI.
+INSERT INTO integrations (kind, connected, secret)
+  SELECT 'twilio', FALSE, md5(random()::text || clock_timestamp()::text)
+  WHERE NOT EXISTS (SELECT 1 FROM integrations WHERE kind = 'twilio');
+
+-- Optional company-wide labor rate for Reporting's labor-cost-per-job metric.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS default_hourly_rate NUMERIC(10,2) DEFAULT 0;
