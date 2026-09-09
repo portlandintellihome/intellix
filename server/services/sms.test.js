@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 
 import {
   normalizePhone, renderTemplate, isWithinQuietHours, nextAllowedSendTime,
-  isSmsConfigured, processMessage, enqueueMessage,
+  isSmsConfigured, processMessage, enqueueMessage, isSmsEnabled, sendViaTwilio,
 } from './sms.js'
 
 test('normalizePhone coerces formats + scientific notation to E.164', () => {
@@ -107,4 +107,68 @@ test('isSmsConfigured reflects env presence', () => {
   if (!saved.TWILIO_ACCOUNT_SID) delete process.env.TWILIO_ACCOUNT_SID
   if (!saved.TWILIO_AUTH_TOKEN) delete process.env.TWILIO_AUTH_TOKEN
   if (!saved.TWILIO_FROM_NUMBER) delete process.env.TWILIO_FROM_NUMBER
+})
+
+
+// --- A2P kill switch -------------------------------------------------------
+// Outbound client SMS must be impossible while SMS_ENABLED is not "true".
+
+test('isSmsEnabled fails closed for missing/empty/malformed values', () => {
+  const prev = process.env.SMS_ENABLED
+  for (const v of [undefined, '', '  ', 'false', 'TRUE_ISH', '1', 'yes', 'on']) {
+    if (v === undefined) delete process.env.SMS_ENABLED
+    else process.env.SMS_ENABLED = v
+    assert.equal(isSmsEnabled(), false, `expected disabled for ${JSON.stringify(v)}`)
+  }
+  for (const v of ['true', 'TRUE', ' True ']) {
+    process.env.SMS_ENABLED = v
+    assert.equal(isSmsEnabled(), true, `expected enabled for ${JSON.stringify(v)}`)
+  }
+  if (prev === undefined) delete process.env.SMS_ENABLED; else process.env.SMS_ENABLED = prev
+})
+
+test('sendViaTwilio refuses to send while disabled, even with valid credentials', async () => {
+  const prev = process.env.SMS_ENABLED
+  delete process.env.SMS_ENABLED
+  process.env.TWILIO_ACCOUNT_SID = 'AC1'
+  process.env.TWILIO_AUTH_TOKEN = 'tok'
+  process.env.TWILIO_FROM_NUMBER = '+15035550123'
+  // Trip-wire: a real send would hit fetch. If it is ever called, fail loudly.
+  const realFetch = globalThis.fetch
+  globalThis.fetch = () => { throw new Error('NETWORK CALL ESCAPED THE KILL SWITCH') }
+  try {
+    await assert.rejects(
+      () => sendViaTwilio({ to: '+13105550123', body: 'hi' }),
+      err => err.code === 'sms_disabled',
+    )
+  } finally {
+    globalThis.fetch = realFetch
+    if (prev === undefined) delete process.env.SMS_ENABLED; else process.env.SMS_ENABLED = prev
+  }
+})
+
+test('processMessage blocks a queued text while disabled and never sends', async () => {
+  const prev = process.env.SMS_ENABLED
+  delete process.env.SMS_ENABLED
+  const rows = { 1: { id: 1, client_id: 7, to_number: '+13105550123', body: 'hi', status: 'queued' } }
+  const query = async (sql, params) => {
+    if (/FROM sms_messages WHERE id/i.test(sql)) return { rows: [rows[1]] }
+    if (/FROM clients WHERE id/i.test(sql)) return { rows: [{ opt_out: false }] }
+    if (/FROM settings/i.test(sql)) return { rows: [{}] }
+    if (/UPDATE sms_messages/i.test(sql)) {
+      assert.doesNotMatch(sql, /status = 'sent'/, 'must never mark sent while disabled')
+      rows[1] = { ...rows[1], error: params[1] ?? rows[1].error }
+      return { rows: [rows[1]] }
+    }
+    return { rows: [] }
+  }
+  const realFetch = globalThis.fetch
+  globalThis.fetch = () => { throw new Error('NETWORK CALL ESCAPED THE KILL SWITCH') }
+  try {
+    const out = await processMessage(query, 1)
+    assert.equal(out.status, 'queued', 'row stays queued, nothing lost')
+  } finally {
+    globalThis.fetch = realFetch
+    if (prev === undefined) delete process.env.SMS_ENABLED; else process.env.SMS_ENABLED = prev
+  }
 })

@@ -9,7 +9,7 @@ import { Router } from 'express'
 import { query as defaultQuery } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import {
-  isSmsConfigured, processDue, onJobOnTheWay, onJobScheduled,
+  isSmsConfigured, isSmsEnabled, processDue, onJobOnTheWay, onJobScheduled,
 } from '../services/sms.js'
 
 function requireInternalKey(req, res, next) {
@@ -27,8 +27,20 @@ export function makeRouter(query = defaultQuery) {
   // Whether Twilio is wired. Safe to expose (boolean only) so Settings can show
   // an "SMS not configured" hint.
   r.get('/status', async (_req, res) => {
-    res.json({ configured: isSmsConfigured() })
+    res.json({ configured: isSmsConfigured(), enabled: isSmsEnabled() })
   })
+
+  // Reject outbound triggers outright while the kill switch is off, so the UI
+  // gets a clear error instead of silently queueing a text that never sends.
+  const requireSmsEnabled = (_req, res, next) => {
+    if (!isSmsEnabled()) {
+      return res.status(503).json({
+        error: 'Outbound SMS is disabled pending A2P campaign approval',
+        code: 'sms_disabled',
+      })
+    }
+    next()
+  }
 
   // Cron entrypoint — flush everything now due. GET and POST both accepted.
   const flush = async (_req, res, next) => {
@@ -37,11 +49,11 @@ export function makeRouter(query = defaultQuery) {
       res.json({ ok: true, ...summary })
     } catch (err) { next(err) }
   }
-  r.get('/process-due', requireInternalKey, flush)
-  r.post('/process-due', requireInternalKey, flush)
+  r.get('/process-due', requireInternalKey, requireSmsEnabled, flush)
+  r.post('/process-due', requireInternalKey, requireSmsEnabled, flush)
 
   // Tech taps "On the way" in the header. Not automatic. Includes ETA if given.
-  r.post('/on-the-way', requireAuth, async (req, res, next) => {
+  r.post('/on-the-way', requireAuth, requireSmsEnabled, async (req, res, next) => {
     try {
       const jobId = req.body?.job_id
       if (!jobId) return res.status(400).json({ error: 'job_id is required' })
@@ -54,7 +66,7 @@ export function makeRouter(query = defaultQuery) {
   })
 
   // Fired by the Calendar when a job is given a date/assignment.
-  r.post('/scheduled', requireAuth, async (req, res, next) => {
+  r.post('/scheduled', requireAuth, requireSmsEnabled, async (req, res, next) => {
     try {
       const jobId = req.body?.job_id
       if (!jobId) return res.status(400).json({ error: 'job_id is required' })

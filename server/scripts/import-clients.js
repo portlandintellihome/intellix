@@ -29,6 +29,20 @@ const DEFAULT_CSV = path.join(process.env.HOME || '', 'Desktop', 'Intellihome_cu
 const TEST_NAME_BLOCKLIST = new Set(['nima pro', 'nima n', 'nima', 'nima office'])
 const TEST_EMAILS = new Set(['info@getintellihome.com'])
 
+// Near-duplicates that the exact name|phone dedupe cannot see. Each was
+// reviewed by hand and confirmed to be the SAME person as an existing clients
+// row, so they route to the UPDATE path rather than inserting a second record.
+//
+// Deliberately NOT listed (share a phone, but are genuinely different people
+// and SHOULD insert as their own clients): Linda Guerrero / Brett Berkowitz,
+// Josh Okhovat / "Zone 26 5946 Oakdale", Philip Graham / Kelly Arballo.
+const MANUAL_MATCHES = [
+  { sourceId: '149515284', existingId: 4,  expectName: 'Cathrine Youssefyeh' },   // CSV: "Kathrine Youssefyeh" (spelling)
+  { sourceId: '187413983', existingId: 25, expectName: 'Vivaik & Menaka Tyagi' }, // CSV: "Vivaik and Menaka Tyagi"
+  { sourceId: '205428280', existingId: 27, expectName: 'Jason Teague' },          // CSV: "Jason Teague 9015 Hubbard"
+  { sourceId: '141436147', existingId: 75, expectName: 'Sima Kohanoff' },         // CSV row has a phone, db row does not
+]
+
 // --- tiny RFC4180-ish CSV parser (no dependency) ---------------------------
 function parseCsv(text) {
   const rows = []
@@ -155,8 +169,10 @@ function mapRow(row) {
   const smsOptOut = doNotService || !notificationsEnabled
 
   // Infer location from the primary address state: CA -> Los Angeles(2), else Portland(1).
+  // No usable address at all -> null. Previously these silently defaulted to
+  // Portland, which asserted a location the source data never supported.
   const state = (primary?.state || '').toUpperCase()
-  const locationId = state === 'CA' ? 2 : 1
+  const locationId = primary ? (state === 'CA' ? 2 : 1) : null
 
   const sourceMeta = {
     housecall_id: sourceId,
@@ -276,23 +292,46 @@ async function main() {
   })
 
   try {
-    // Existing dedupe: by source_id, and by name+phone as a secondary check.
+    // Existing dedupe: by source_id, then by name+phone, then the hand-reviewed
+    // MANUAL_MATCHES table. Matches are no longer discarded -- they route to an
+    // UPDATE that backfills the Housecall fields onto the existing row.
     const sourceIds = deduped.map(m => m.dedupeKey).filter(Boolean)
-    const existingBySource = new Set()
+    const existingIdBySource = new Map()
     if (sourceIds.length) {
       const { rows } = await pool.query(
-        'SELECT source_id FROM clients WHERE source_id = ANY($1)', [sourceIds])
-      rows.forEach(r => existingBySource.add(String(r.source_id)))
+        'SELECT id, source_id FROM clients WHERE source_id = ANY($1)', [sourceIds])
+      rows.forEach(r => existingIdBySource.set(String(r.source_id), r.id))
     }
     const { rows: allExisting } = await pool.query(
-      `SELECT lower(name) AS name, regexp_replace(COALESCE(phone,''),'\\D','','g') AS phone FROM clients`)
-    const existingNamePhone = new Set(allExisting.map(r => `${r.name}|${r.phone}`))
+      `SELECT id, name, lower(name) AS lname, regexp_replace(COALESCE(phone,''),'\\D','','g') AS phone FROM clients`)
+    const existingIdByNamePhone = new Map(allExisting.map(r => [`${r.lname}|${r.phone}`, r.id]))
+    const existingById = new Map(allExisting.map(r => [r.id, r]))
+
+    // Validate MANUAL_MATCHES against the live DB before trusting them: a wrong
+    // id would backfill Housecall data onto the wrong customer.
+    const manualBySource = new Map()
+    const manualProblems = []
+    for (const mm of MANUAL_MATCHES) {
+      const row = existingById.get(mm.existingId)
+      if (!row) { manualProblems.push(`id ${mm.existingId} ("${mm.expectName}") no longer exists`); continue }
+      if (row.name !== mm.expectName) {
+        manualProblems.push(`id ${mm.existingId} expected "${mm.expectName}" but DB has "${row.name}"`); continue
+      }
+      manualBySource.set(String(mm.sourceId), mm.existingId)
+    }
+    if (manualProblems.length) {
+      console.error('\n[import] MANUAL_MATCHES validation FAILED:')
+      manualProblems.forEach(p => console.error(`   - ${p}`))
+      throw new Error('MANUAL_MATCHES no longer matches the database; refusing to continue')
+    }
 
     const toInsert = []
-    let dupExisting = 0
+    const toUpdate = []
     for (const m of deduped) {
-      if (m.dedupeKey && existingBySource.has(String(m.dedupeKey))) { dupExisting++; continue }
-      if (existingNamePhone.has(`${m.nameKey}|${m.phone}`)) { dupExisting++; continue }
+      const key = String(m.dedupeKey)
+      const manualId = manualBySource.get(key)
+      const existingId = manualId ?? existingIdBySource.get(key) ?? existingIdByNamePhone.get(`${m.nameKey}|${m.phone}`)
+      if (existingId != null) { toUpdate.push({ m, existingId, manual: manualId != null }); continue }
       toInsert.push(m)
     }
 
@@ -302,9 +341,23 @@ async function main() {
     console.log(`  skipped — no name:            ${noNameSkips.length}`)
     console.log(`  skipped — test/internal:      ${testSkips.length}`)
     console.log(`  skipped — duplicate in file:  ${intraFileDupes}`)
-    console.log(`  skipped — already in DB:      ${dupExisting}`)
+    console.log(`  EXISTING clients to backfill: ${toUpdate.length}  (of which ${toUpdate.filter(u => u.manual).length} via MANUAL_MATCHES)`)
     console.log(`  NEW clients to insert:        ${toInsert.length}`)
     console.log('===================================================================')
+
+    const nullLoc = toInsert.filter(m => m.payload.location_id == null).length
+    console.log(`  new inserts with location_id = NULL (no address): ${nullLoc}`)
+    console.log(`  new inserts location 1 (Portland): ${toInsert.filter(m => m.payload.location_id === 1).length}`)
+    console.log(`  new inserts location 2 (LA):       ${toInsert.filter(m => m.payload.location_id === 2).length}`)
+
+    console.log('\n[import] backfill targets (existing row <- Housecall fields):')
+    toUpdate.forEach(u => {
+      const p = u.m.payload
+      const row = existingById.get(u.existingId)
+      console.log(`   db#${String(u.existingId).padStart(3)} "${row.name}"${u.manual ? '  [MANUAL]' : ''}`
+        + `  <- src=${p.source_id} LTV=${p.lifetime_value ?? '-'} last_service=${p.last_service_date ?? '-'}`
+        + (u.manual ? `  (csv name: "${p.name}")` : ''))
+    })
 
     if (testSkips.length) {
       console.log('\n[import] test/internal rows skipped (eyeball these):')
@@ -329,11 +382,24 @@ async function main() {
     }
 
     // --- COMMIT: single transaction ---
-    console.log(`\n[import] COMMIT: inserting ${toInsert.length} clients in one transaction…`)
+    console.log(`\n[import] COMMIT: inserting ${toInsert.length} clients and backfilling ${toUpdate.length} in one transaction…`)
     const client = await pool.connect()
     let inserted = 0
+    let updated = 0
     try {
       await client.query('BEGIN')
+      // Backfill matched rows first. `source_id IS NULL` keeps this idempotent
+      // and stops a re-run from clobbering an already-linked client.
+      for (const u of toUpdate) {
+        const p = u.m.payload
+        const res = await client.query(
+          `UPDATE clients
+              SET source_id = $1, source_system = $2, lifetime_value = $3, last_service_date = $4
+            WHERE id = $5 AND source_id IS NULL`,
+          [p.source_id, SOURCE_SYSTEM, p.lifetime_value, p.last_service_date, u.existingId],
+        )
+        updated += res.rowCount
+      }
       for (const m of toInsert) {
         const p = m.payload
         // ON CONFLICT on the partial unique index (source_id) is the final
@@ -359,7 +425,7 @@ async function main() {
     } finally {
       client.release()
     }
-    console.log(`\n[import] DONE — inserted ${inserted}, skipped ${deduped.length - toInsert.length + testSkips.length + noNameSkips.length} (dupes/test/no-name).`)
+    console.log(`\n[import] DONE — inserted ${inserted}, backfilled ${updated}, skipped ${testSkips.length + noNameSkips.length + intraFileDupes} (test/no-name/in-file dupes).`)
   } finally {
     await pool.end()
   }

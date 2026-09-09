@@ -31,6 +31,19 @@ export function isSmsConfigured() {
   return Boolean(sid && token && from)
 }
 
+// Global kill switch, independent of Twilio credentials. FAIL-CLOSED: outbound
+// client SMS is OFF unless SMS_ENABLED is exactly "true". A missing, empty, or
+// malformed value keeps sending disabled, so losing the env var can never
+// silently re-enable texting.
+//
+// Reason it exists: the A2P 10DLC campaign is REJECTED. Sending on a rejected
+// campaign risks carrier filtering and suspension of the Twilio number, so no
+// client text may leave the system until A2P is approved. Flip to "true" only
+// after approval.
+export function isSmsEnabled() {
+  return String(process.env.SMS_ENABLED || '').trim().toLowerCase() === 'true'
+}
+
 // ---------------------------------------------------------------------------
 // Pure helpers
 // ---------------------------------------------------------------------------
@@ -109,6 +122,12 @@ export function nextAllowedSendTime(date, opts = {}) {
 // ---------------------------------------------------------------------------
 
 export async function sendViaTwilio({ to, body }) {
+  // Kill switch first -- before credentials, before any network call.
+  if (!isSmsEnabled()) {
+    const err = new Error('Outbound SMS is disabled (SMS_ENABLED is not "true"); A2P campaign pending approval')
+    err.code = 'sms_disabled'
+    throw err
+  }
   const { sid, token, from } = smsEnv()
   if (!sid || !token || !from) {
     const err = new Error('SMS is not configured (set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER)')
@@ -241,6 +260,14 @@ export async function processMessage(query, id, { now = new Date(), settings = n
   if (!msg.to_number) {
     const u = await query(
       `UPDATE sms_messages SET status = 'skipped', error = 'no valid phone number' WHERE id = $1 RETURNING *`, [id])
+    return u.rows[0]
+  }
+
+  if (!isSmsEnabled()) {
+    // Global kill switch. Leave the row queued (nothing lost) and record why.
+    // Never reaches Twilio.
+    const u = await query(
+      `UPDATE sms_messages SET error = 'blocked: outbound SMS disabled (A2P pending)' WHERE id = $1 RETURNING *`, [id])
     return u.rows[0]
   }
 
