@@ -605,3 +605,35 @@ INSERT INTO integrations (kind, connected, secret)
 
 -- Optional company-wide labor rate for Reporting's labor-cost-per-job metric.
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS default_hourly_rate NUMERIC(10,2) DEFAULT 0;
+
+-- ============================================================================
+-- FEATURE: Housecall jobs import (job history, revenue, provenance)
+-- ----------------------------------------------------------------------------
+-- The jobs export shares NO identifier with the customer export, so jobs link
+-- to clients by matching "Customer name" against clients.name. Unmatched jobs
+-- are imported with client_id NULL rather than dropped.
+--
+-- These are ALTERs (not CREATE TABLE columns) so they land on the existing prod
+-- jobs table -- CREATE TABLE IF NOT EXISTS is a no-op there -- and so
+-- verifySchema() covers them via expectedColumns().
+-- ============================================================================
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_id     TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_system TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_meta   JSONB;
+
+-- jobs.start_date is DATE, but the export carries a real time-of-day
+-- (2022-06-28T17:30:00-07:00). Keep full fidelity here; start_date is still
+-- populated so existing Calendar/Jobs UI keeps working unchanged.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS scheduled_start_at TIMESTAMPTZ;
+
+-- Job revenue. 1189 of 3139 exported rows are non-zero (net $650,625.44, max
+-- $23,019.42, and one -$50.00 credit), so NUMERIC(12,2) is comfortably wide.
+-- Zero-amount rows are stored faithfully as 0.00, not NULL.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS amount NUMERIC(12,2);
+
+-- "Job #" is unique per exported row, so re-running the import cannot double-insert.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_source_id
+  ON jobs (source_id) WHERE source_id IS NOT NULL;
+-- Unmatched (client_id NULL) jobs are cheap to find for later reconciliation.
+CREATE INDEX IF NOT EXISTS idx_jobs_unmatched
+  ON jobs (source_system) WHERE client_id IS NULL;

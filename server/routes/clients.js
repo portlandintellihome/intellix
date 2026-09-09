@@ -66,6 +66,24 @@ router.patch('/:id', async (req, res, next) => {
 })
 
 // Per-client SMS audit trail — every text queued/sent/skipped for this client.
+// GET /api/clients/:id/jobs — full job history for one client, newest first.
+// Read-only. Deliberately INCLUDES imported Housecall rows: they are excluded
+// from the Jobs tabs (a work queue) but are exactly what belongs on a client's
+// record as reference history.
+router.get('/:id/jobs', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, name, status, address, amount, start_date, scheduled_start_at,
+              created_at, completed_at, source_system
+         FROM jobs
+        WHERE client_id = $1
+        ORDER BY COALESCE(scheduled_start_at, created_at) DESC`,
+      [req.params.id],
+    )
+    res.json(rows)
+  } catch (err) { next(err) }
+})
+
 router.get('/:id/sms', async (req, res, next) => {
   try {
     const { rows } = await query(

@@ -96,10 +96,14 @@ function ClientDetail({ client, onClose, locations, onLocationChanged }) {
   const [smsOptOut, setSmsOptOut] = useState(Boolean(client.sms_opt_out))
   const [smsBusy, setSmsBusy] = useState(false)
   const [texts, setTexts] = useState(null)
+  const [jobHistory, setJobHistory] = useState(null)
   const initials = client.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   useEffect(() => {
     apiGet(`/api/clients/${client.id}/sms`).then(setTexts).catch(() => setTexts([]))
+    // Job history is fetched per-client rather than embedded in /api/clients:
+    // the list endpoint never returned jobs, so this section rendered empty.
+    apiGet(`/api/clients/${client.id}/jobs`).then(setJobHistory).catch(() => setJobHistory([]))
   }, [client.id])
 
   const toggleSms = async () => {
@@ -207,15 +211,23 @@ function ClientDetail({ client, onClose, locations, onLocationChanged }) {
           </div>
 
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>Job history</div>
-            {client.jobs.map((job, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 9, padding: '10px 14px', marginBottom: 6 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
+              Job history{jobHistory?.length ? ` (${jobHistory.length})` : ''}
+            </div>
+            {jobHistory === null && <div style={{ fontSize: 11.5, color: 'var(--text3)' }}>Loading…</div>}
+            {jobHistory?.length === 0 && <div style={{ fontSize: 11.5, color: 'var(--text3)' }}>No jobs yet.</div>}
+            {(jobHistory || []).map(job => (
+              <div key={job.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 9, padding: '10px 14px', marginBottom: 6 }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: jobStatusColors[job.status] || '#aeaeb2', flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>{job.name}</div>
-                  <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 2 }}>{job.date}</div>
+                  <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 2 }}>
+                    {(job.scheduled_start_at || job.created_at || '').slice(0, 10)}
+                    {job.amount != null && Number(job.amount) !== 0 ? ` · $${Number(job.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+                    {job.source_system ? ' · imported' : ''}
+                  </div>
                 </div>
-                <span style={{ fontSize: 10.5, fontWeight: 600, color: jobStatusColors[job.status] || '#aeaeb2' }}>{jobStatusLabels[job.status] || job.status}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 600, color: jobStatusColors[job.status] || '#aeaeb2', flexShrink: 0 }}>{jobStatusLabels[job.status] || job.status}</span>
               </div>
             ))}
           </div>

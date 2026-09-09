@@ -686,20 +686,26 @@ export default function JobsProposals() {
     )
   }
 
-  // Not-yet-started jobs live in the "Pending" tab; everything else (active,
-  // done, cancelled) shows under "Active jobs".
-  const NOT_STARTED = ['pending', 'scheduled']
-  const pendingJobs = jobs.filter(j => NOT_STARTED.includes(j.status))
-  const activeJobs = jobs.filter(j => !NOT_STARTED.includes(j.status))
+  // Imported Housecall history is reference data, not a work queue: it is
+  // excluded from every Jobs tab and count, and surfaced on each client's
+  // record instead (GET /api/clients/:id/jobs). Matched on source_system being
+  // set at all rather than a specific literal, so future imports are covered.
+  const liveJobs = jobs.filter(j => !j.source_system)
+  const ACTIVE = ['in_progress', 'scheduled']
+  const pendingJobs = liveJobs.filter(j => j.status === 'pending')
+  const activeJobs = liveJobs.filter(j => ACTIVE.includes(j.status))
+  // Completed work needs its own tab, otherwise finishing a job makes it
+  // unreachable from this page.
+  const completedJobs = liveJobs.filter(j => j.status === 'completed')
   const completedRecently = (j) => {
     if (j.status !== 'completed' || !j.completed_at) return false
     return (Date.now() - new Date(j.completed_at).getTime()) <= 30 * 86400000
   }
   const statusCounts = [
-    { label: 'Pending', count: jobs.filter(j => j.status === 'pending').length },
-    { label: 'Scheduled', count: jobs.filter(j => j.status === 'scheduled').length },
-    { label: 'In progress', count: jobs.filter(j => j.status === 'in_progress').length },
-    { label: 'Completed (30d)', count: jobs.filter(completedRecently).length },
+    { label: 'Pending', count: liveJobs.filter(j => j.status === 'pending').length },
+    { label: 'Scheduled', count: liveJobs.filter(j => j.status === 'scheduled').length },
+    { label: 'In progress', count: liveJobs.filter(j => j.status === 'in_progress').length },
+    { label: 'Completed (30d)', count: liveJobs.filter(completedRecently).length },
   ]
 
   return (
@@ -739,6 +745,7 @@ export default function JobsProposals() {
           { key: 'proposals', label: `Proposals (${proposals.length})` },
           { key: 'pending',   label: `Pending (${pendingJobs.length})` },
           { key: 'jobs',      label: `Active jobs (${activeJobs.length})` },
+          { key: 'completed', label: `Completed (${completedJobs.length})` },
         ].map(t => (
           <button key={t.key} onClick={() => { setTab(t.key); setSelected(null) }} style={{ padding: '10px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'transparent', color: tab === t.key ? 'var(--accent)' : 'var(--text2)', borderBottom: `2px solid ${tab === t.key ? 'var(--accent)' : 'transparent'}`, fontFamily: 'var(--font)' }}>
             {t.label}
@@ -828,6 +835,49 @@ export default function JobsProposals() {
                       <div style={{ display: 'flex', gap: 4 }}>
                         {job.assigned.map(a => <Avatar key={a} initials={a} size={26} />)}
                       </div>
+                    </div>
+                  </div>
+                  {selected?.kind === 'job' && selected?.id === job.id && (
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border2)' }}>
+                      <JobNotes job={job} onSaved={onJobSaved} />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={e => { e.stopPropagation(); setEditingJob(job) }} style={{ ...ghostBtn, fontSize: 11 }}>Edit</button>
+                      </div>
+                      <JobPhotos jobId={job.id} />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* COMPLETED — natively created jobs that are done. Imported Housecall
+            history is deliberately not here; it lives on the client record. */}
+        {tab === 'completed' && (
+          <div>
+            {completedJobs.length === 0 && (
+              <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>No completed jobs</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text3)' }}>Jobs you mark complete will appear here. Imported Housecall history is on each client&rsquo;s record.</div>
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {completedJobs.map(job => (
+                <div key={job.id} onClick={() => setSelected(selected?.id === job.id ? null : { kind: 'job', ...job })} style={{ background: 'var(--bg2)', border: `1px solid ${selected?.id === job.id ? 'var(--accent)' : 'var(--border2)'}`, borderRadius: 11, padding: '14px 16px', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{job.name}</div>
+                        <Badge text={job.status} />
+                        <LocationBadge name={locationName(job.location_id)} />
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+                        {job.client || 'No client'} · {job.address || '—'}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {job.assigned.map(a => <Avatar key={a} initials={a} size={26} />)}
                     </div>
                   </div>
                   {selected?.kind === 'job' && selected?.id === job.id && (
