@@ -95,6 +95,7 @@ export function makeRouter(query = defaultQuery) {
             `SELECT j.id, j.name, j.address, j.start_date, c.name AS client_name
                FROM jobs j LEFT JOIN clients c ON c.id = j.client_id
               WHERE $1 = ANY(j.assigned)
+                AND j.source_system IS NULL
                 AND COALESCE(j.status, 'pending') NOT IN ('completed', 'cancelled')
                 AND (j.start_date = CURRENT_DATE OR j.start_date IS NULL)
               ORDER BY (j.start_date = CURRENT_DATE) DESC NULLS LAST, j.start_date DESC NULLS LAST

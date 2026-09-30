@@ -7,6 +7,7 @@ import { Clock } from 'lucide-react'
 import { apiGet } from './lib/api'
 import { getToken } from './lib/auth'
 import * as haptics from './lib/haptics'
+import { isLiveJob } from './lib/jobs'
 
 const API = () => import.meta.env.VITE_API_URL || ''
 
@@ -73,9 +74,13 @@ export default function ClockInControl({ variant = 'desktop' }) {
     // Preload active jobs for the pickers + default the on-the-way selector.
     try {
       const rows = await apiGet('/api/jobs')
-      const active = (rows || []).filter(j => ACTIVE.has(j.status))
+      // Native live jobs only: this picker feeds the on-the-way client text,
+      // so imported history must never be selectable here.
+      const active = (rows || []).filter(j => isLiveJob(j) && ACTIVE.has(j.status))
       setJobs(active)
-      setPickJob(String(suggested?.id || entry?.job_id || active[0]?.id || ''))
+      const inList = (id) => id != null && active.some(j => String(j.id) === String(id))
+      const preferred = [suggested?.id, entry?.job_id].find(inList)
+      setPickJob(String(preferred ?? active[0]?.id ?? ''))
     } catch { /* ignore — pickers just show empty */ }
   }
 

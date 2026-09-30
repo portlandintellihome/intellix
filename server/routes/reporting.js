@@ -29,6 +29,9 @@ router.get('/', async (req, res, next) => {
   const sinceAnd = since ? 'AND created_at >= $1' : ''
   // time_entries range filter keys off the punch-in time, not created_at.
   const teWhere = since ? 'WHERE te.clock_in_at >= $1' : ''
+  // Job metrics count native jobs only: imported history (source_system set)
+  // is reference data, never live work. Mirrors isLiveJob in src/lib/jobs.js.
+  const liveJobsWhere = `WHERE source_system IS NULL ${sinceAnd}`
 
   console.log('[reporting] request', { range, since: since?.toISOString() })
 
@@ -72,17 +75,19 @@ router.get('/', async (req, res, next) => {
     ] = await Promise.all([
       query(`SELECT COALESCE(SUM(total), 0)::float AS v FROM proposals
              WHERE status = 'Accepted' AND created_at >= date_trunc('month', NOW())`),
-      query(`SELECT COUNT(*)::int AS v FROM jobs WHERE status IS NOT NULL AND status <> 'completed'`),
+      query(`SELECT COUNT(*)::int AS v FROM jobs
+             WHERE source_system IS NULL AND status IN ('scheduled', 'in_progress')`),
       query(`SELECT COUNT(*)::int AS v FROM support_tickets WHERE status <> 'Resolved'`),
       query(`SELECT COUNT(*)::int AS v FROM clients WHERE created_at >= date_trunc('month', NOW())`),
 
-      query(`SELECT COUNT(*)::int AS v FROM jobs ${sinceWhere}`, sinceParam),
+      query(`SELECT COUNT(*)::int AS v FROM jobs ${liveJobsWhere}`, sinceParam),
       query(`SELECT COALESCE(status, 'Unspecified') AS status, COUNT(*)::int AS count
-             FROM jobs ${sinceWhere} GROUP BY 1 ORDER BY count DESC`, sinceParam),
+             FROM jobs ${liveJobsWhere} GROUP BY 1 ORDER BY count DESC`, sinceParam),
       query(`SELECT COUNT(*)::int AS v FROM jobs
-             WHERE status = 'completed' AND closed_at >= date_trunc('month', NOW())`),
+             WHERE source_system IS NULL
+               AND status = 'completed' AND closed_at >= date_trunc('month', NOW())`),
       query(`SELECT COUNT(*)::int AS v FROM jobs
-             WHERE status = 'completed'
+             WHERE source_system IS NULL AND status = 'completed'
                AND closed_at >= date_trunc('month', NOW()) - INTERVAL '1 month'
                AND closed_at <  date_trunc('month', NOW())`),
       query(`SELECT COALESCE(SUM(total), 0)::float AS total_value,
@@ -112,7 +117,7 @@ router.get('/', async (req, res, next) => {
              GROUP BY 1 ORDER BY count DESC`, sinceParam),
 
       query(`SELECT initials, COUNT(*)::int AS count FROM (
-               SELECT UNNEST(assigned) AS initials FROM jobs ${sinceWhere}
+               SELECT UNNEST(assigned) AS initials FROM jobs ${liveJobsWhere}
              ) sub GROUP BY initials ORDER BY count DESC`, sinceParam),
       query(`SELECT tm.name, tm.initials, COUNT(t.id)::int AS count
              FROM team_members tm

@@ -4,6 +4,7 @@ import { apiGet } from './lib/api'
 import { getToken } from './lib/auth'
 import { colorForInitials } from './lib/color'
 import { useIsMobile } from './lib/useIsMobile'
+import { isLiveJob } from './lib/jobs'
 
 const PALETTE = ['#0066cc', '#34c759', '#534AB7', '#ff9500', '#ff3b30']
 
@@ -20,7 +21,8 @@ function getFirstDayOfMonth(month, year) {
 }
 
 function mapJobs(jobRows) {
-  return jobRows.map(j => {
+  // Live work only; imported history lives on the client record.
+  return jobRows.filter(isLiveJob).map(j => {
     const s = j.start_date ? new Date(j.start_date) : null
     const e = j.end_date ? new Date(j.end_date) : null
     const assigned = Array.isArray(j.assigned) ? j.assigned : []

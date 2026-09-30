@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { apiGet } from './lib/api'
 import { colorForInitials, initialsOf } from './lib/color'
+import { isLiveJob } from './lib/jobs'
 
 const PLAN_TIERS = [
   { id: 'None',     price: 0,   color: 'var(--text3)', swatch: '#aeaeb2' },
@@ -351,7 +352,7 @@ export default function Outreach() {
       apiGet('/api/check-ins').catch(() => []),
     ]).then(([c, j, ci]) => {
       setClients(c)
-      setJobs(j)
+      setJobs(j.filter(isLiveJob))
 
       const planMap = {}
       for (const client of c) {

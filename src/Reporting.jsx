@@ -134,7 +134,7 @@ export default function Reporting() {
             {/* KPI ROW (always month-to-date / point-in-time) */}
             <div style={s.kpiGrid}>
               <KpiCard label="Revenue MTD"    value={fmtMoney(data.kpi.revenue_mtd)}      sub="from accepted proposals" color="#34c759" />
-              <KpiCard label="Active jobs"    value={fmtNumber(data.kpi.active_jobs)}     sub="status ≠ Complete"        color="#0066cc" />
+              <KpiCard label="Active jobs"    value={fmtNumber(data.kpi.active_jobs)}     sub="scheduled + in progress"        color="#0066cc" />
               <KpiCard label="Open tickets"   value={fmtNumber(data.kpi.open_tickets)}    sub="status ≠ Resolved"        color="#ff3b30" />
               <KpiCard label="New clients MTD" value={fmtNumber(data.kpi.new_clients_mtd)} sub="this calendar month"      color="#ff9500" />
             </div>

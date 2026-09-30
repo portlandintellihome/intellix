@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiGet } from './lib/api'
 import { colorForInitials, initialsOf } from './lib/color'
+import { isActiveLiveJob } from './lib/jobs'
 
 const quickActions = [
   { label: 'New job', path: '/jobs', color: '#1d1d1f' },
@@ -85,12 +86,13 @@ export default function Dashboard() {
     })
   }, [])
 
-  const activeJobs = jobs.filter(j => j.status && !['completed', 'cancelled', 'scheduled', 'pending'].includes(j.status))
+  // Native scheduled + in_progress only; imported history never counts as live work.
+  const activeJobs = jobs.filter(isActiveLiveJob)
   const openTickets = tickets.filter(t => t.status !== 'Resolved')
   const availableTeam = team.filter(m => m.status === 'Available' || m.status === 'On site' || m.status === 'Remote' || m.status === 'Office')
 
   const stats = [
-    { label: 'Active jobs', value: String(activeJobs.length), sub: activeJobs.length === 0 ? 'no active jobs' : `${activeJobs.length} in progress`, color: '#0066cc' },
+    { label: 'Active jobs', value: String(activeJobs.length), sub: activeJobs.length === 0 ? 'no active jobs' : `${activeJobs.filter(j => j.status === 'in_progress').length} in progress`, color: '#0066cc' },
     { label: 'Open tickets', value: String(openTickets.length), sub: openTickets.length === 0 ? 'no open tickets' : `${openTickets.filter(t => t.priority === 'Urgent').length} urgent`, color: '#ff3b30' },
     { label: 'Build docs', value: String(buildsCount), sub: buildsCount === 0 ? 'no builds yet' : 'across all jobs', color: '#34c759' },
     { label: 'Team available', value: String(availableTeam.length), sub: team.length === 0 ? 'no team members' : `of ${team.length} members`, color: '#ff9500' },
@@ -138,11 +140,11 @@ export default function Dashboard() {
           {/* ACTIVE JOBS */}
           <div style={s.card}>
             <div style={s.cardTitle}>Active jobs</div>
-            {jobs.length === 0 && (
+            {activeJobs.length === 0 && (
               <div style={{ fontSize: 11.5, color: 'var(--text3)', padding: '14px 0 4px' }}>No active jobs.</div>
             )}
-            {jobs.map((j, i) => (
-              <div key={i} style={i < jobs.length - 1 ? s.row : s.rowLast}>
+            {activeJobs.map((j, i) => (
+              <div key={i} style={i < activeJobs.length - 1 ? s.row : s.rowLast}>
                 <div style={s.dot(j.color)} />
                 <div style={{ flex:1 }}>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>

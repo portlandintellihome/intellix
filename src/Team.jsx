@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { apiGet } from './lib/api'
 import { colorForInitials, initialsOf } from './lib/color'
 import { getToken } from './lib/auth'
+import { isLiveJob } from './lib/jobs'
 
 const statusStyle = {
   'On site':   { bg: 'rgba(52,199,89,0.09)',  color: '#248a3d', dot: '#34c759' },
@@ -63,7 +64,7 @@ function TimesheetModal({ emp, isAdmin, onClose }) {
       setRows(data)
     } catch (err) { setError(err.message); setRows([]) }
   }
-  useEffect(() => { load(); apiGet('/api/jobs').then(setJobs).catch(() => {}) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); apiGet('/api/jobs').then(rows => setJobs(rows.filter(isLiveJob))).catch(() => {}) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const startEdit = (r) => {
     setEditing(r.id)

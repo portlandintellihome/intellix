@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { apiGet } from './lib/api'
 import { useIsMobile } from './lib/useIsMobile'
+import { isLiveJob } from './lib/jobs'
 
 const DRIVER_CATS = ['All', 'AV', 'Audio', 'Lighting', 'HVAC', 'Security', 'Network', 'Shades']
 
@@ -370,7 +371,7 @@ export default function ComposerBuilds() {
         client: b.client_name || '',
         date: b.build_date ? new Date(b.build_date).toLocaleDateString() : '',
       })))
-      setExistingJobs(jobs.map(j => ({ ...j, client: j.client_name || '' })))
+      setExistingJobs(jobs.filter(isLiveJob).map(j => ({ ...j, client: j.client_name || '' })))
       setDrivers(drvs.map(d => ({ ...d, cat: d.category, conn: d.connection, file: d.filename })))
     })
   }, [])

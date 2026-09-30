@@ -3,6 +3,7 @@ import { colorForInitials, initialsOf } from './lib/color'
 import { getToken } from './lib/auth'
 import * as haptics from './lib/haptics'
 import { usePullToRefresh, PullIndicator } from './lib/usePullToRefresh'
+import { isLiveJob } from './lib/jobs'
 
 const TOKEN_KEY = 'intellix_token'
 const PRIORITIES = [
@@ -637,7 +638,7 @@ export default function Todos() {
       authedJson('/api/tickets').catch(() => []),
     ]).then(([t, j, c, tk]) => {
       setUsers(t)
-      setJobs(j)
+      setJobs(j.filter(isLiveJob))
       setClients(c)
       setTickets(tk)
     })

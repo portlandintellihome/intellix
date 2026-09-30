@@ -5,6 +5,7 @@ import { getToken } from './lib/auth'
 import { capturePhoto, dataUrlToBlob } from './lib/photo'
 import * as haptics from './lib/haptics'
 import { usePullToRefresh, PullIndicator } from './lib/usePullToRefresh'
+import { isLiveJob, ACTIVE_STATUSES } from './lib/jobs'
 
 const BASE = import.meta.env.VITE_API_URL || ''
 
@@ -690,10 +691,9 @@ export default function JobsProposals() {
   // excluded from every Jobs tab and count, and surfaced on each client's
   // record instead (GET /api/clients/:id/jobs). Matched on source_system being
   // set at all rather than a specific literal, so future imports are covered.
-  const liveJobs = jobs.filter(j => !j.source_system)
-  const ACTIVE = ['in_progress', 'scheduled']
+  const liveJobs = jobs.filter(isLiveJob)
   const pendingJobs = liveJobs.filter(j => j.status === 'pending')
-  const activeJobs = liveJobs.filter(j => ACTIVE.includes(j.status))
+  const activeJobs = liveJobs.filter(j => ACTIVE_STATUSES.includes(j.status))
   // Completed work needs its own tab, otherwise finishing a job makes it
   // unreachable from this page.
   const completedJobs = liveJobs.filter(j => j.status === 'completed')
