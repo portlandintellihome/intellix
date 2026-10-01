@@ -6,9 +6,9 @@ import { isLiveJob } from './lib/jobs'
 import { useIsMobile } from './lib/useIsMobile'
 
 const quickActions = [
-  { label: 'New job', path: '/jobs', color: '#1d1d1f' },
-  { label: 'New build doc', path: '/composer', color: '#0066cc' },
-  { label: 'New proposal', path: '/jobs', color: '#534AB7' },
+  { label: 'Job', path: '/jobs', color: '#1d1d1f' },
+  { label: 'Build Doc', path: '/composer', color: '#0066cc' },
+  { label: 'Proposal', path: '/jobs', color: '#534AB7' },
 ]
 
 const messages = []
@@ -42,8 +42,9 @@ const s = {
   // desktop, two per row on phones (Team available spans the full width).
   statRow: { display:'flex', flexWrap:'wrap', gap:10, marginBottom:16, maxWidth:'100%' },
   statCard: (wide) => ({ flex: wide ? '1 1 100%' : '1 1 120px', minWidth:0, boxSizing:'border-box', background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:12, padding:'14px 16px', overflowWrap:'anywhere' }),
-  quickRow: { display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' },
-  quickBtn: (bg) => ({ padding:'8px 16px', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', border:'none', background:bg, color:'#fff', fontFamily:'var(--font)' }),
+  // One row at every width: on phones the three buttons share the row equally.
+  quickRow: { display:'flex', gap:8, marginBottom:16, flexWrap:'nowrap', maxWidth:'100%' },
+  quickBtn: (bg, mobile) => ({ ...(mobile ? { flex:'1 1 0', minWidth:0, padding:'9px 6px' } : { padding:'8px 16px' }), borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', border:'none', background:bg, color:'#fff', fontFamily:'var(--font)', whiteSpace:'nowrap', textAlign:'center' }),
   avatar: (bg) => ({ width:28, height:28, minWidth:28, borderRadius:'50%', background:bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff' }),
   teamRow: { display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:'1px solid var(--border2)' },
   teamRowLast: { display:'flex', alignItems:'center', gap:10, padding:'8px 0' },
@@ -114,7 +115,7 @@ export default function Dashboard() {
         {/* QUICK ACTIONS */}
         <div style={s.quickRow}>
           {quickActions.map(a => (
-            <button key={a.label} onClick={() => navigate(a.path)} style={s.quickBtn(a.color)}>
+            <button key={a.label} onClick={() => navigate(a.path)} style={s.quickBtn(a.color, isMobile)}>
               + {a.label}
             </button>
           ))}
