@@ -88,7 +88,7 @@ export default function Dashboard() {
     { label: 'Pending', value: String(pendingProposals.length), sub: 'open proposals', color: '#534AB7' },
     { label: 'Scheduled', value: String(scheduledJobs.length), sub: 'jobs scheduled', color: '#ff9500' },
     { label: 'Active', value: String(activeJobs.length), sub: 'jobs in progress', color: '#0066cc' },
-    { label: 'Completed', value: String(completedThisMonth.length), sub: new Date().toLocaleDateString('en-US', { month: 'long' }), color: '#34c759' },
+    { label: 'Completed', value: String(completedThisMonth.length), sub: 'This month', color: '#34c759' },
     { label: 'Team available', value: String(availableTeam.length), sub: team.length === 0 ? 'no team members' : `of ${team.length} members`, color: '#ff9500' },
   ]
 
