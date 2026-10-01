@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { apiGet } from './lib/api'
 import { colorForInitials, initialsOf } from './lib/color'
 import { isLiveJob } from './lib/jobs'
+import { authHeader } from './lib/auth'
 
 const PLAN_TIERS = [
   { id: 'None',     price: 0,   color: 'var(--text3)', swatch: '#aeaeb2' },
@@ -387,7 +388,7 @@ export default function Outreach() {
     try {
       const res = await fetch(`${base}/api/clients/${clientId}/plan`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({
           plan_tier: planData.tier,
           plan_start_date: planData.startDate,
@@ -415,7 +416,7 @@ export default function Outreach() {
     try {
       const res = await fetch(`${base}/api/check-ins`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({
           client_id: clientId,
           interval_days: intervalDays,

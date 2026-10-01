@@ -156,7 +156,7 @@ export default function HomeDoc() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${BASE}/api/clients`).then(r => r.ok ? r.json() : []).catch(() => []),
+      authedJson('/api/clients').catch(() => []),
       authedJson('/api/jobs').catch(() => []),
       authedJson('/api/team').catch(() => []),
       authedJson('/api/auth/me').catch(() => null),

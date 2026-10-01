@@ -27,6 +27,7 @@ import homedocsRouter from './routes/homedocs.js'
 import timeEntriesRouter from './routes/time-entries.js'
 import smsRouter from './routes/sms.js'
 import { migrate } from './db/migrate.js'
+import { apiGate } from './middleware/apiGate.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const distDir = path.resolve(__dirname, '..', 'dist')
@@ -38,6 +39,10 @@ app.use(cors())
 // Raised from the 100kb default so Assist can accept base64 image payloads
 // (vision attachments) in the JSON body. Multipart photo uploads bypass this.
 app.use(express.json({ limit: '15mb' }))
+
+// Every /api route requires a logged-in user unless it is on the explicit
+// public list in middleware/apiGate.js. Must stay ahead of all routers.
+app.use('/api', apiGate)
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' })
