@@ -2,12 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CAPACITOR_DEBUG</key>
+	<key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>Intellix</string>
+	<string>Intellix</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -22,8 +22,16 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Intellix uses the camera to attach photos to jobs, jobsite documentation, and equipment records.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Intellix can save documentation photos to your photo library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Intellix uses your photo library to attach existing photos to jobs and job documentation.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -47,11 +55,5 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
-	<key>NSCameraUsageDescription</key>
-	<string>Intellix uses the camera to attach photos to support tickets, jobsite documentation, and equipment records.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Intellix uses your photo library to attach existing photos to support tickets and job documentation.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Intellix can save documentation photos to your photo library.</string>
 </dict>
 </plist>
