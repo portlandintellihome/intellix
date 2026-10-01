@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { apiGet } from './lib/api'
 import { colorForInitials, initialsOf } from './lib/color'
 import { isLiveJob } from './lib/jobs'
+import { useIsMobile } from './lib/useIsMobile'
 
 const quickActions = [
   { label: 'New job', path: '/jobs', color: '#1d1d1f' },
@@ -34,12 +35,13 @@ const s = {
   label: { fontSize:11.5, color:'var(--text)', fontWeight:500, lineHeight:1.4 },
   sub: { fontSize:10.5, color:'var(--text3)', marginTop:2 },
   dot: (c) => ({ width:7, height:7, minWidth:7, borderRadius:'50%', background:c, marginTop:4 }),
-  badge: (bg, color) => ({ display:'inline-block', padding:'2px 8px', borderRadius:5, fontSize:10, fontWeight:700, background:bg, color }),
+  badge: (bg, color) => ({ display:'inline-block', padding:'2px 8px', borderRadius:5, fontSize:10, fontWeight:700, background:bg, color, whiteSpace:'nowrap', flexShrink:0 }),
   // Two cards side by side when there is room, stacked on phones.
   grid2: { display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap:14, marginBottom:14 },
-  // Stat tiles wrap: five across on desktop, two per row on phones.
-  grid5: { display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:10, marginBottom:16 },
-  statCard: { background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:12, padding:'14px 16px' },
+  // Stat tiles wrap onto new rows instead of overflowing: five across on
+  // desktop, two per row on phones (Team available spans the full width).
+  statRow: { display:'flex', flexWrap:'wrap', gap:10, marginBottom:16, maxWidth:'100%' },
+  statCard: (wide) => ({ flex: wide ? '1 1 100%' : '1 1 120px', minWidth:0, boxSizing:'border-box', background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:12, padding:'14px 16px', overflowWrap:'anywhere' }),
   quickRow: { display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' },
   quickBtn: (bg) => ({ padding:'8px 16px', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', border:'none', background:bg, color:'#fff', fontFamily:'var(--font)' }),
   avatar: (bg) => ({ width:28, height:28, minWidth:28, borderRadius:'50%', background:bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff' }),
@@ -52,6 +54,7 @@ const STATUS_LABELS = { pending: 'Pending', scheduled: 'Scheduled', in_progress:
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
 
   const [jobs, setJobs] = useState([])
   const [proposals, setProposals] = useState([])
@@ -92,7 +95,7 @@ export default function Dashboard() {
     { label: 'Scheduled', value: String(scheduledJobs.length), sub: 'jobs scheduled', color: '#ff9500' },
     { label: 'Active', value: String(activeJobs.length), sub: 'jobs in progress', color: '#0066cc' },
     { label: 'Completed', value: String(completedThisMonth.length), sub: 'This month', color: '#34c759' },
-    { label: 'Team available', value: String(availableTeam.length), sub: team.length === 0 ? 'no team members' : `of ${team.length} members`, color: '#ff9500' },
+    { label: 'Team available', value: String(availableTeam.length), sub: team.length === 0 ? 'no team members' : `of ${team.length} members`, color: '#ff9500', wideOnMobile: true },
   ]
 
   return (
@@ -118,9 +121,9 @@ export default function Dashboard() {
         </div>
 
         {/* STATS */}
-        <div style={s.grid5}>
+        <div style={s.statRow}>
           {stats.map(st => (
-            <div key={st.label} style={s.statCard}>
+            <div key={st.label} style={s.statCard(isMobile && st.wideOnMobile)}>
               <div style={{ fontSize:10, color:'var(--text2)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.3px', marginBottom:6 }}>{st.label}</div>
               <div style={{ fontSize:26, fontWeight:700, color:'var(--text)', letterSpacing:'-0.5px' }}>{st.value}</div>
               <div style={{ fontSize:10.5, color:'var(--text3)', marginTop:4, fontWeight:500 }}>
