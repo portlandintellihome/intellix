@@ -17,6 +17,9 @@ const CHECKIN_INTERVALS = [
 ]
 
 const lbl = { fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }
+// Table cards: wide tables scroll horizontally inside the card, never the page.
+const tableCard = { background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }
+
 const inp = { width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 11px', fontSize: 12.5, color: 'var(--text)', fontFamily: 'var(--font)', outline: 'none' }
 const primaryBtn = { padding: '8px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#1d1d1f', color: '#fff', fontFamily: 'var(--font)' }
 const ghostBtn = { padding: '8px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontFamily: 'var(--font)' }
@@ -87,7 +90,7 @@ function PlanModal({ client, plan, onClose, onSave }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 14, width: 500, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }}>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 14, width: 500, maxWidth: 'calc(100vw - 32px)', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px 14px', borderBottom: '1px solid var(--border2)' }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Assign plan</div>
@@ -159,7 +162,7 @@ function ServicePlansTab({ clients, plans, onSavePlan }) {
 
   if (clients.length === 0) {
     return (
-      <div style={{ padding: '16px 24px 24px' }}>
+      <div style={{ padding: '16px clamp(16px, 4vw, 24px) 24px' }}>
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>No clients yet</div>
           <div style={{ fontSize: 11.5, color: 'var(--text3)' }}>Add a client first, then you can assign them a service plan.</div>
@@ -169,9 +172,9 @@ function ServicePlansTab({ clients, plans, onSavePlan }) {
   }
 
   return (
-    <div style={{ padding: '16px 24px 24px' }}>
+    <div style={{ padding: '16px clamp(16px, 4vw, 24px) 24px' }}>
       {/* MRR + TIER COUNTS */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1fr 1fr', gap: 10, marginBottom: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 18 }}>
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '14px 16px' }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>Monthly recurring revenue</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)' }}>${mrr.toLocaleString()}</div>
@@ -189,8 +192,9 @@ function ServicePlansTab({ clients, plans, onSavePlan }) {
         ))}
       </div>
 
-      {/* CLIENT TABLE */}
-      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, overflow: 'hidden' }}>
+      {/* CLIENT TABLE — scrolls sideways inside its own card on narrow screens */}
+      <div style={tableCard}>
+        <div style={{ minWidth: 640 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto', padding: '9px 16px', background: 'var(--bg3)', borderBottom: '1px solid var(--border2)' }}>
           {['Client', 'Plan', 'Price', 'Start', 'Renewal', ''].map(h => (
             <div key={h} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{h}</div>
@@ -228,6 +232,7 @@ function ServicePlansTab({ clients, plans, onSavePlan }) {
             </div>
           )
         })}
+        </div>
       </div>
 
       {selected && (
@@ -261,7 +266,7 @@ function CheckInsTab({ clients, jobs, sent, onSend }) {
 
   if (clients.length === 0) {
     return (
-      <div style={{ padding: '16px 24px 24px' }}>
+      <div style={{ padding: '16px clamp(16px, 4vw, 24px) 24px' }}>
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>No clients yet</div>
           <div style={{ fontSize: 11.5, color: 'var(--text3)' }}>Check-in sequences kick in once you have clients with completed jobs.</div>
@@ -271,8 +276,10 @@ function CheckInsTab({ clients, jobs, sent, onSend }) {
   }
 
   return (
-    <div style={{ padding: '16px 24px 24px' }}>
-      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, overflow: 'hidden' }}>
+    <div style={{ padding: '16px clamp(16px, 4vw, 24px) 24px' }}>
+      {/* Scrolls sideways inside its own card on narrow screens */}
+      <div style={tableCard}>
+        <div style={{ minWidth: 600 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1.4fr repeat(3, 1fr)', padding: '9px 16px', background: 'var(--bg3)', borderBottom: '1px solid var(--border2)' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Client</div>
           {CHECKIN_INTERVALS.map(iv => (
@@ -332,6 +339,7 @@ function CheckInsTab({ clients, jobs, sent, onSend }) {
             </div>
           )
         })}
+        </div>
       </div>
     </div>
   )
@@ -433,7 +441,7 @@ export default function Outreach() {
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '13px clamp(16px, 4vw, 24px)', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Outreach</div>
         </div>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13, fontWeight: 500 }}>Loading…</div>
@@ -444,11 +452,11 @@ export default function Outreach() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px clamp(16px, 4vw, 24px)', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Outreach</div>
       </div>
 
-      <div style={{ display: 'flex', padding: '0 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', padding: '0 clamp(16px, 4vw, 24px)', background: 'var(--bg2)', borderBottom: '1px solid var(--border2)', flexShrink: 0 }}>
         {tabs.map(t => (
           <button
             key={t.key}

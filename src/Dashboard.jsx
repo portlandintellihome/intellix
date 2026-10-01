@@ -23,10 +23,11 @@ function inCurrentMonth(iso) {
 }
 
 const s = {
-  topbar: { display:'flex', alignItems:'center', justifyContent:'space-between', padding:'13px 24px', background:'var(--bg2)', borderBottom:'1px solid var(--border2)', flexShrink:0 },
+  topbar: { display:'flex', alignItems:'center', justifyContent:'space-between', padding:'13px clamp(16px, 4vw, 24px)', background:'var(--bg2)', borderBottom:'1px solid var(--border2)', flexShrink:0 },
   title: { fontSize:14, fontWeight:700, color:'var(--text)' },
-  content: { flex:1, overflowY:'auto', padding:'16px 24px 24px' },
-  card: { background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:12, padding:'14px 16px', marginBottom:14 },
+  // Side gutter shrinks to 16px on phones; content never scrolls sideways.
+  content: { flex:1, overflowY:'auto', overflowX:'hidden', padding:'16px clamp(16px, 4vw, 24px) 24px' },
+  card: { background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:12, padding:'14px 16px', marginBottom:14, minWidth:0, overflowWrap:'anywhere' },
   cardTitle: { fontSize:10.5, color:'var(--text2)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:12 },
   row: { display:'flex', gap:10, padding:'8px 0', borderBottom:'1px solid var(--border2)', alignItems:'flex-start' },
   rowLast: { display:'flex', gap:10, padding:'8px 0', alignItems:'flex-start' },
@@ -34,8 +35,10 @@ const s = {
   sub: { fontSize:10.5, color:'var(--text3)', marginTop:2 },
   dot: (c) => ({ width:7, height:7, minWidth:7, borderRadius:'50%', background:c, marginTop:4 }),
   badge: (bg, color) => ({ display:'inline-block', padding:'2px 8px', borderRadius:5, fontSize:10, fontWeight:700, background:bg, color }),
-  grid2: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 },
-  grid5: { display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:10, marginBottom:16 },
+  // Two cards side by side when there is room, stacked on phones.
+  grid2: { display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap:14, marginBottom:14 },
+  // Stat tiles wrap: five across on desktop, two per row on phones.
+  grid5: { display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:10, marginBottom:16 },
   statCard: { background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:12, padding:'14px 16px' },
   quickRow: { display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' },
   quickBtn: (bg) => ({ padding:'8px 16px', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', border:'none', background:bg, color:'#fff', fontFamily:'var(--font)' }),
