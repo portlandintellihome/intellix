@@ -2,6 +2,7 @@
 // recurring client check-in feature) — this one drives the post-job
 // "How's your IntelliHome system working?" follow-up.
 //
+//   GET  /api/checkins/status        — { enabled } (EMAIL_ENABLED kill switch)
 //   GET  /api/checkins/due           — jobs ready to receive the email
 //   POST /api/checkins/:job_id/sent  — mark a job as sent
 //
@@ -9,10 +10,14 @@
 // internal automation), so they're protected by a shared-secret header
 // (X-Internal-Key matching INTELLIX_INTERNAL_KEY) rather than the user
 // JWT auth used elsewhere.
+//
+// Gated by the EMAIL_ENABLED client-email kill switch (services/email.js):
+// while it is off, /due returns an empty batch, so the runner sends nothing.
 
 import { Router } from 'express'
 import { query } from '../db.js'
 import { generateCheckinEmail, isAIConfigured } from '../services/aiProcessor.js'
+import { isEmailEnabled } from '../services/email.js'
 
 const router = Router()
 
@@ -41,9 +46,23 @@ function substitute(template, values) {
   )
 }
 
+// GET /api/checkins/status — whether client email is enabled. Boolean only,
+// unauthenticated, like /api/sms/status.
+router.get('/status', (_req, res) => {
+  res.json({ enabled: isEmailEnabled() })
+})
+
 // GET /api/checkins/due
 router.get('/due', requireInternalKey, async (_req, res, next) => {
   try {
+    // Kill switch first: no query, no AI generation, no audit-log rows.
+    if (!isEmailEnabled()) {
+      return res.json({
+        email_enabled: false,
+        count: 0, skipped_count: 0, skipped: [], jobs: [],
+      })
+    }
+
     const settingsRes = await query('SELECT * FROM settings WHERE id = 1')
     const settings = settingsRes.rows[0] || {}
     const delayDays = Number.isFinite(Number(settings.checkin_delay_days))
@@ -53,7 +72,6 @@ router.get('/due', requireInternalKey, async (_req, res, next) => {
     // available/fails (so the n8n batch still sends something sensible).
     const subjectTpl = settings.checkin_email_subject || "How's your IntelliHome system working?"
     const bodyTpl = settings.checkin_email_body || ''
-    const supportUrl = (process.env.PUBLIC_BASE_URL || '').replace(/\/+$/, '') + '/support'
     const aiOn = isAIConfigured()
 
     const { rows } = await query(
@@ -113,7 +131,6 @@ router.get('/due', requireInternalKey, async (_req, res, next) => {
         full_name: r.client_name || '',
         address: r.client_address || r.job_address || '',
         review_url: reviewUrl,
-        support_url: supportUrl,
         job_name: r.job_name || '',
         location_name: r.location_name || '',
       }
@@ -171,6 +188,7 @@ router.get('/due', requireInternalKey, async (_req, res, next) => {
     }
 
     res.json({
+      email_enabled: true,
       delay_days: delayDays,
       ai_personalized: aiOn,
       configured: aiOn || Boolean(bodyTpl),

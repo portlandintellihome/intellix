@@ -106,3 +106,55 @@ test('PATCH ignores phase (deprecated, not patchable)', async () => {
     assert.equal(calls.some(c => /UPDATE jobs SET/.test(c.sql)), false, 'phase-only patch must not UPDATE')
   } finally { srv.close() }
 })
+
+test('POST /api/jobs created as completed stamps completed_at', async () => {
+  const calls = []
+  const query = async (sql, params) => {
+    calls.push({ sql: sql.replace(/\s+/g, ' ').trim(), params })
+    return { rows: [{ id: 2, name: 'Done already', status: 'completed' }] }
+  }
+  const { srv, base } = await serverWith(query)
+  try {
+    const { status } = await req(base, 'POST', '/api/jobs', { name: 'Done already', status: 'completed', location_id: 1 })
+    assert.equal(status, 201)
+    const insert = calls.find(c => /INSERT INTO jobs/.test(c.sql))
+    assert.match(insert.sql, /completed_at\) VALUES/, 'completed_at must be in the INSERT column list')
+    assert.match(insert.sql, /CASE WHEN \$4 = 'completed' THEN NOW\(\) END/)
+  } finally { srv.close() }
+})
+
+test('PATCH completed -> scheduled (reopen) clears completed_at and a cleanup-suppressed check-in', async () => {
+  const calls = []
+  const query = async (sql, params) => {
+    calls.push({ sql: sql.replace(/\s+/g, ' ').trim(), params })
+    if (/SELECT id, status, completed_at/.test(sql)) {
+      return { rows: [{ id: 9, status: 'completed', completed_at: '2026-09-30T20:00:00Z' }] }
+    }
+    return { rows: [{ id: 9, status: 'scheduled' }] }
+  }
+  const { srv, base } = await serverWith(query)
+  try {
+    const { status } = await req(base, 'PATCH', '/api/jobs/9', { status: 'scheduled' })
+    assert.equal(status, 200)
+    const update = calls.find(c => /UPDATE jobs SET/.test(c.sql))
+    assert.match(update.sql, /completed_at = NULL/)
+    assert.match(update.sql, /checkin_sent_at = CASE WHEN checkin_sent_at = completed_at THEN NULL ELSE checkin_sent_at END/)
+  } finally { srv.close() }
+})
+
+test('PATCH that keeps a job completed does not clear completed_at', async () => {
+  const calls = []
+  const query = async (sql) => {
+    calls.push({ sql: sql.replace(/\s+/g, ' ').trim() })
+    if (/SELECT id, status, completed_at/.test(sql)) {
+      return { rows: [{ id: 9, status: 'completed', completed_at: '2026-09-30T20:00:00Z' }] }
+    }
+    return { rows: [{ id: 9, status: 'completed' }] }
+  }
+  const { srv, base } = await serverWith(query)
+  try {
+    await req(base, 'PATCH', '/api/jobs/9', { scope: 'notes only' })
+    const update = calls.find(c => /UPDATE jobs SET/.test(c.sql))
+    assert.doesNotMatch(update.sql, /completed_at = NULL/)
+  } finally { srv.close() }
+})

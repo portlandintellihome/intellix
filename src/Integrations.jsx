@@ -345,7 +345,7 @@ export default function Integrations() {
                 color="#ff9500"
                 name="CompanyCam"
                 category="Photo documentation"
-                description="Sync job-site photos to client projects. Photos tagged by job appear on job and ticket pages. API integration not yet wired."
+                description="Sync job-site photos to client projects. Photos tagged by job appear on job pages. API integration not yet wired."
                 status={<StatusPill connected={false} label="Not connected" />}
               />
             </>

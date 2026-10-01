@@ -213,7 +213,6 @@ function TodoCard({ todo, onClick, onToggle, draggable, onDragStart, onDragEnd, 
             )}
             {todo.job_name && <Chip color="#0066cc">Job · {todo.job_name}</Chip>}
             {todo.client_name && <Chip color="#534AB7">{todo.client_name}</Chip>}
-            {todo.ticket_short_id && <Chip color="#ff9500">{todo.ticket_short_id || `#${todo.ticket_id}`}</Chip>}
           </div>
         </div>
       </div>
@@ -296,13 +295,13 @@ function KanbanView({ todos, onSelect, onToggle, onMove }) {
   )
 }
 
-function NewTodoModal({ onClose, onCreated, isAdmin, currentUserId, users, jobs, clients, tickets }) {
+function NewTodoModal({ onClose, onCreated, isAdmin, currentUserId, users, jobs, clients }) {
   const [form, setForm] = useState({
     title: '', description: '',
     assigned_to: currentUserId,
     priority: 'normal', status: 'open',
     due_date: '', due_time: '',
-    job_id: '', client_id: '', ticket_id: '',
+    job_id: '', client_id: '',
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [submitting, setSubmitting] = useState(false)
@@ -323,7 +322,6 @@ function NewTodoModal({ onClose, onCreated, isAdmin, currentUserId, users, jobs,
         due_at: timeToISO(form.due_time),
         job_id: form.job_id ? Number(form.job_id) : null,
         client_id: form.client_id ? Number(form.client_id) : null,
-        ticket_id: form.ticket_id ? Number(form.ticket_id) : null,
       }
       const created = await authedJson('/api/todos', { method: 'POST', body: JSON.stringify(body) })
       haptics.medium() // to-do created
@@ -392,7 +390,7 @@ function NewTodoModal({ onClose, onCreated, isAdmin, currentUserId, users, jobs,
             )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <div style={lbl}>Linked job</div>
               <select style={inp} value={form.job_id} onChange={e => set('job_id', e.target.value)}>
@@ -405,13 +403,6 @@ function NewTodoModal({ onClose, onCreated, isAdmin, currentUserId, users, jobs,
               <select style={inp} value={form.client_id} onChange={e => set('client_id', e.target.value)}>
                 <option value="">— None —</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <div style={lbl}>Linked ticket</div>
-              <select style={inp} value={form.ticket_id} onChange={e => set('ticket_id', e.target.value)}>
-                <option value="">— None —</option>
-                {tickets.map(t => <option key={t.id} value={t.id}>{t.ticket_id || `#${t.id}`} · {t.issue?.slice(0, 32)}</option>)}
               </select>
             </div>
           </div>
@@ -434,7 +425,7 @@ function NewTodoModal({ onClose, onCreated, isAdmin, currentUserId, users, jobs,
   )
 }
 
-function SidePanel({ todo, onClose, onUpdate, onDelete, isAdmin, currentUserId, users, jobs, clients, tickets }) {
+function SidePanel({ todo, onClose, onUpdate, onDelete, isAdmin, currentUserId, users, jobs, clients }) {
   const [form, setForm] = useState(() => ({
     title: todo.title || '',
     description: todo.description || '',
@@ -445,7 +436,6 @@ function SidePanel({ todo, onClose, onUpdate, onDelete, isAdmin, currentUserId, 
     due_time: isoToTimeInput(todo.due_at),
     job_id: todo.job_id || '',
     client_id: todo.client_id || '',
-    ticket_id: todo.ticket_id || '',
   }))
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const [saving, setSaving] = useState(false)
@@ -467,7 +457,6 @@ function SidePanel({ todo, onClose, onUpdate, onDelete, isAdmin, currentUserId, 
         due_at: form.due_time ? timeToISO(form.due_time) : null,
         job_id: form.job_id ? Number(form.job_id) : null,
         client_id: form.client_id ? Number(form.client_id) : null,
-        ticket_id: form.ticket_id ? Number(form.ticket_id) : null,
       }
       const updated = await authedJson(`/api/todos/${todo.id}`, { method: 'PATCH', body: JSON.stringify(body) })
       haptics.medium() // to-do saved
@@ -567,14 +556,6 @@ function SidePanel({ todo, onClose, onUpdate, onDelete, isAdmin, currentUserId, 
             </select>
           </div>
 
-          <div style={{ marginBottom: 12 }}>
-            <div style={lbl}>Linked ticket</div>
-            <select style={inp} value={form.ticket_id} onChange={e => set('ticket_id', e.target.value)}>
-              <option value="">— None —</option>
-              {tickets.map(t => <option key={t.id} value={t.id}>{t.ticket_id || `#${t.id}`} · {t.issue?.slice(0, 32)}</option>)}
-            </select>
-          </div>
-
           <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border2)', fontSize: 11, color: 'var(--text3)', lineHeight: 1.6 }}>
             Created by {todo.created_by_name || '—'} · {fmtDate(todo.created_at)}
             {todo.completed_at && <> · Completed {fmtDate(todo.completed_at)} at {fmtTime(todo.completed_at)}</>}
@@ -616,7 +597,6 @@ export default function Todos() {
   const [users, setUsers] = useState([])
   const [jobs, setJobs] = useState([])
   const [clients, setClients] = useState([])
-  const [tickets, setTickets] = useState([])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -635,12 +615,10 @@ export default function Todos() {
       authedJson('/api/team').catch(() => []),
       authedJson('/api/jobs').catch(() => []),
       authedJson('/api/clients').catch(() => []),
-      authedJson('/api/tickets').catch(() => []),
-    ]).then(([t, j, c, tk]) => {
+    ]).then(([t, j, c]) => {
       setUsers(t)
       setJobs(j.filter(isLiveJob))
       setClients(c)
-      setTickets(tk)
     })
   }, [])
 
@@ -774,7 +752,6 @@ export default function Todos() {
           users={users}
           jobs={jobs}
           clients={clients}
-          tickets={tickets}
         />
       )}
 
@@ -789,7 +766,6 @@ export default function Todos() {
           users={users}
           jobs={jobs}
           clients={clients}
-          tickets={tickets}
         />
       )}
     </div>

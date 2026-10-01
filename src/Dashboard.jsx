@@ -2,26 +2,24 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiGet } from './lib/api'
 import { colorForInitials, initialsOf } from './lib/color'
-import { isActiveLiveJob } from './lib/jobs'
+import { isLiveJob } from './lib/jobs'
 
 const quickActions = [
   { label: 'New job', path: '/jobs', color: '#1d1d1f' },
   { label: 'New build doc', path: '/composer', color: '#0066cc' },
-  { label: 'New support ticket', path: '/tickets', color: '#ff9500' },
   { label: 'New proposal', path: '/jobs', color: '#534AB7' },
 ]
 
 const messages = []
 const activity = []
 
-function relTime(iso) {
-  if (!iso) return ''
-  const diff = Date.now() - new Date(iso).getTime()
-  const h = Math.floor(diff / 3_600_000)
-  if (h < 1) return 'just now'
-  if (h < 24) return `${h}h ago`
-  const d = Math.floor(h / 24)
-  return `${d}d ago`
+// Proposals not yet accepted. Accepted ones have already become jobs.
+const PENDING_PROPOSAL_STATUSES = ['Draft', 'Sent']
+
+function inCurrentMonth(iso) {
+  if (!iso) return false
+  const d = new Date(iso), now = new Date()
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
 }
 
 const s = {
@@ -37,7 +35,7 @@ const s = {
   dot: (c) => ({ width:7, height:7, minWidth:7, borderRadius:'50%', background:c, marginTop:4 }),
   badge: (bg, color) => ({ display:'inline-block', padding:'2px 8px', borderRadius:5, fontSize:10, fontWeight:700, background:bg, color }),
   grid2: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 },
-  grid4: { display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:10, marginBottom:16 },
+  grid5: { display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:10, marginBottom:16 },
   statCard: { background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:12, padding:'14px 16px' },
   quickRow: { display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' },
   quickBtn: (bg) => ({ padding:'8px 16px', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', border:'none', background:bg, color:'#fff', fontFamily:'var(--font)' }),
@@ -53,48 +51,44 @@ export default function Dashboard() {
   const navigate = useNavigate()
 
   const [jobs, setJobs] = useState([])
-  const [tickets, setTickets] = useState([])
+  const [proposals, setProposals] = useState([])
   const [team, setTeam] = useState([])
-  const [buildsCount, setBuildsCount] = useState(0)
 
   useEffect(() => {
     Promise.all([
       apiGet('/api/jobs').catch(() => []),
-      apiGet('/api/tickets').catch(() => []),
+      apiGet('/api/proposals').catch(() => []),
       apiGet('/api/team').catch(() => []),
-      apiGet('/api/composer-builds').catch(() => []),
-    ]).then(([j, t, tm, b]) => {
+    ]).then(([j, p, tm]) => {
       setJobs(j.map(x => ({
         ...x,
         client: x.client_name || '',
         assigned: Array.isArray(x.assigned) ? x.assigned.join(' / ') : '',
         color: colorForInitials(Array.isArray(x.assigned) ? x.assigned[0] : null),
       })))
-      setTickets(t.map(x => ({
-        ...x,
-        client: x.client_name || '',
-        urgent: x.priority === 'Urgent',
-        age: relTime(x.created_at),
-      })))
+      setProposals(p)
       setTeam(tm.map(m => ({
         ...m,
         initials: m.initials || initialsOf(m.name),
         color: colorForInitials(m.initials || initialsOf(m.name)),
         job: m.job || '—',
       })))
-      setBuildsCount(b.length)
     })
   }, [])
 
-  // Native scheduled + in_progress only; imported history never counts as live work.
-  const activeJobs = jobs.filter(isActiveLiveJob)
-  const openTickets = tickets.filter(t => t.status !== 'Resolved')
+  // Job tiles count native jobs only; imported history never counts as live work.
+  const liveJobs = jobs.filter(isLiveJob)
+  const pendingProposals = proposals.filter(p => PENDING_PROPOSAL_STATUSES.includes(p.status))
+  const scheduledJobs = liveJobs.filter(j => j.status === 'scheduled')
+  const activeJobs = liveJobs.filter(j => j.status === 'in_progress')
+  const completedThisMonth = liveJobs.filter(j => j.status === 'completed' && inCurrentMonth(j.completed_at))
   const availableTeam = team.filter(m => m.status === 'Available' || m.status === 'On site' || m.status === 'Remote' || m.status === 'Office')
 
   const stats = [
-    { label: 'Active jobs', value: String(activeJobs.length), sub: activeJobs.length === 0 ? 'no active jobs' : `${activeJobs.filter(j => j.status === 'in_progress').length} in progress`, color: '#0066cc' },
-    { label: 'Open tickets', value: String(openTickets.length), sub: openTickets.length === 0 ? 'no open tickets' : `${openTickets.filter(t => t.priority === 'Urgent').length} urgent`, color: '#ff3b30' },
-    { label: 'Build docs', value: String(buildsCount), sub: buildsCount === 0 ? 'no builds yet' : 'across all jobs', color: '#34c759' },
+    { label: 'Pending', value: String(pendingProposals.length), sub: 'open proposals', color: '#534AB7' },
+    { label: 'Scheduled', value: String(scheduledJobs.length), sub: 'jobs scheduled', color: '#ff9500' },
+    { label: 'Active', value: String(activeJobs.length), sub: 'jobs in progress', color: '#0066cc' },
+    { label: 'Completed', value: String(completedThisMonth.length), sub: new Date().toLocaleDateString('en-US', { month: 'long' }), color: '#34c759' },
     { label: 'Team available', value: String(availableTeam.length), sub: team.length === 0 ? 'no team members' : `of ${team.length} members`, color: '#ff9500' },
   ]
 
@@ -121,7 +115,7 @@ export default function Dashboard() {
         </div>
 
         {/* STATS */}
-        <div style={s.grid4}>
+        <div style={s.grid5}>
           {stats.map(st => (
             <div key={st.label} style={s.statCard}>
               <div style={{ fontSize:10, color:'var(--text2)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.3px', marginBottom:6 }}>{st.label}</div>
@@ -179,34 +173,8 @@ export default function Dashboard() {
 
         </div>
 
-        {/* MIDDLE ROW — TICKETS + MESSAGES */}
-        <div style={s.grid2}>
-
-          {/* SERVICE TICKETS */}
-          <div style={s.card}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-              <div style={s.cardTitle}>Open service tickets</div>
-              <button onClick={() => navigate('/tickets')} style={{ fontSize:10.5, fontWeight:600, color:'var(--accent)', background:'none', border:'none', cursor:'pointer', fontFamily:'var(--font)' }}>View all</button>
-            </div>
-            {tickets.length === 0 && (
-              <div style={{ fontSize: 11.5, color: 'var(--text3)', padding: '6px 0' }}>No open tickets.</div>
-            )}
-            {tickets.map((t, i) => (
-              <div key={i} style={i < tickets.length - 1 ? s.row : s.rowLast}>
-                <div style={s.dot(t.urgent ? '#ff3b30' : '#ff9500')} />
-                <div style={{ flex:1 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    <div style={{ fontSize:12, fontWeight:600, color:'var(--text)' }}>{t.client}</div>
-                    {t.urgent && <span style={s.badge('rgba(255,59,48,0.08)', '#d70015')}>Urgent</span>}
-                  </div>
-                  <div style={{ fontSize:10.5, color:'var(--text2)', marginTop:2 }}>{t.issue}</div>
-                  <div style={{ fontSize:10, color:'var(--text3)', marginTop:2 }}>{t.age}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* CLIENT MESSAGES */}
+        {/* CLIENT MESSAGES */}
+        <div>
           <div style={s.card}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
               <div style={s.cardTitle}>Client messages</div>

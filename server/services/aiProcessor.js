@@ -7,7 +7,7 @@
 //     refused, error)
 //
 // Public API:
-//   processAIRequest({ taskType, userId, clientId?, jobId?, ticketId?,
+//   processAIRequest({ taskType, userId, clientId?, jobId?,
 //                       prompt? | messages?, systemPrompt?, model? }) → { reply, usage }
 //   isAIConfigured() → boolean
 //
@@ -37,16 +37,15 @@ async function logInteraction(queryFn, row) {
   try {
     await queryFn(
       `INSERT INTO ai_interactions
-         (user_id, task_type, client_id, job_id, ticket_id,
+         (user_id, task_type, client_id, job_id,
           redacted_prompt, raw_response, model,
           tokens_input, tokens_output, status, error_message)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
       [
         row.userId ?? null,
         row.taskType,
         row.clientId ?? null,
         row.jobId ?? null,
-        row.ticketId ?? null,
         row.prompt ?? null,
         row.response ?? null,
         row.model ?? null,
@@ -71,7 +70,6 @@ export async function processAIRequest(opts, deps = {}) {
     userId = null,
     clientId = null,
     jobId = null,
-    ticketId = null,
     prompt = null,
     messages = null,
     systemPrompt = null,
@@ -101,7 +99,7 @@ export async function processAIRequest(opts, deps = {}) {
   }
   if (invalidReason) {
     await logInteraction(queryFn, {
-      userId, taskType, clientId, jobId, ticketId,
+      userId, taskType, clientId, jobId,
       prompt: convo ? combinedText(convo) : null,
       model,
       status: 'invalid_input',
@@ -115,7 +113,7 @@ export async function processAIRequest(opts, deps = {}) {
     const r = await queryFn('SELECT ai_opt_out FROM clients WHERE id = $1', [clientId])
     if (r.rows[0]?.ai_opt_out) {
       await logInteraction(queryFn, {
-        userId, taskType, clientId, jobId, ticketId,
+        userId, taskType, clientId, jobId,
         prompt: combinedText(convo),
         model,
         status: 'refused_opt_out',
@@ -135,7 +133,7 @@ export async function processAIRequest(opts, deps = {}) {
     const guard = guardPII(m.content)
     if (guard.blocked) {
       await logInteraction(queryFn, {
-        userId, taskType, clientId, jobId, ticketId,
+        userId, taskType, clientId, jobId,
         prompt: combinedText(convo),
         model,
         status: 'blocked',
@@ -147,7 +145,7 @@ export async function processAIRequest(opts, deps = {}) {
 
   if (!isAIConfigured() && !anthropicClient) {
     await logInteraction(queryFn, {
-      userId, taskType, clientId, jobId, ticketId,
+      userId, taskType, clientId, jobId,
       prompt: combinedText(convo),
       model,
       status: 'missing_key',
@@ -188,7 +186,7 @@ export async function processAIRequest(opts, deps = {}) {
     })
   } catch (err) {
     await logInteraction(queryFn, {
-      userId, taskType, clientId, jobId, ticketId,
+      userId, taskType, clientId, jobId,
       prompt: combinedText(convo),
       model,
       status: 'error',
@@ -204,7 +202,7 @@ export async function processAIRequest(opts, deps = {}) {
     .join('')
 
   await logInteraction(queryFn, {
-    userId, taskType, clientId, jobId, ticketId,
+    userId, taskType, clientId, jobId,
     prompt: combinedText(convo),
     response: reply,
     model,

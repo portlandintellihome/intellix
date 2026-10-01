@@ -6,7 +6,7 @@ const router = Router()
 
 const ALLOWED_PATCH = [
   'title', 'description',
-  'assigned_to', 'job_id', 'client_id', 'ticket_id',
+  'assigned_to', 'job_id', 'client_id',
   'priority', 'status', 'due_date', 'due_at', 'completed_at',
 ]
 
@@ -15,8 +15,6 @@ const SELECT_TODO = `
     t.*,
     j.name        AS job_name,
     c.name        AS client_name,
-    st.ticket_id  AS ticket_short_id,
-    st.issue      AS ticket_issue,
     a.name        AS assigned_name,
     a.initials    AS assigned_initials,
     a.email       AS assigned_email,
@@ -24,7 +22,6 @@ const SELECT_TODO = `
   FROM todos t
   LEFT JOIN jobs            j  ON j.id  = t.job_id
   LEFT JOIN clients         c  ON c.id  = t.client_id
-  LEFT JOIN support_tickets st ON st.id = t.ticket_id
   LEFT JOIN users           a  ON a.id  = t.assigned_to
   LEFT JOIN users           cb ON cb.id = t.created_by
 `
@@ -107,7 +104,7 @@ router.post('/', requireAuth, async (req, res, next) => {
 
     const {
       title, description,
-      assigned_to, job_id, client_id, ticket_id,
+      assigned_to, job_id, client_id,
       priority, status, due_date, due_at,
     } = req.body || {}
 
@@ -124,13 +121,13 @@ router.post('/', requireAuth, async (req, res, next) => {
     const insertSql = `
       INSERT INTO todos (
         title, description, assigned_to, created_by,
-        job_id, client_id, ticket_id,
+        job_id, client_id,
         priority, status, due_date, due_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7,
-              COALESCE($8, 'normal'),
-              COALESCE($9, 'open'),
-              $10, $11)
+      VALUES ($1, $2, $3, $4, $5, $6,
+              COALESCE($7, 'normal'),
+              COALESCE($8, 'open'),
+              $9, $10)
       RETURNING id`
 
     const { rows: inserted } = await query(insertSql, [
@@ -140,7 +137,6 @@ router.post('/', requireAuth, async (req, res, next) => {
       req.user.id,
       job_id || null,
       client_id || null,
-      ticket_id || null,
       priority || null,
       status || null,
       due_date || null,

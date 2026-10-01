@@ -92,8 +92,9 @@ export function makeRouter(query = defaultQuery) {
 
       const { rows } = await query(
         `INSERT INTO jobs (name, client_id, address, status, priority, scope,
-                           start_date, end_date, location_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                           start_date, end_date, location_id, completed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+                 CASE WHEN $4 = 'completed' THEN NOW() END)
          RETURNING *`,
         [
           body.name, body.client_id || null, body.address || null,
@@ -110,7 +111,8 @@ export function makeRouter(query = defaultQuery) {
   // Patch a job. The only field this handler is feature-aware about is
   // `status` — when it transitions to 'completed' and completed_at is still
   // NULL, we stamp completed_at = NOW() so the Google review check-in flow
-  // can pick the job up at the right time.
+  // can pick the job up at the right time; moving back out of 'completed'
+  // clears it again (see `reopening` below).
   r.patch('/:id', async (req, res, next) => {
     try {
       const { rows: existing } = await query(
@@ -133,6 +135,21 @@ export function makeRouter(query = defaultQuery) {
         && before.status !== 'completed'
         && before.completed_at == null
       if (becomingComplete) setClauses.push('completed_at = NOW()')
+
+      // Reopening (completed -> anything else) clears the stamp, so the next
+      // real completion re-stamps completed_at and fires the completed text.
+      // checkin_sent_at is cleared only when it equals completed_at: that is
+      // the signature of a bulk cleanup that suppressed the check-in at
+      // completion time (both set to the same NOW() in one statement). A real
+      // check-in is marked sent days after completion, so it is never equal,
+      // and a client who actually got one is never emailed twice.
+      const reopening = 'status' in body
+        && body.status !== 'completed'
+        && before.status === 'completed'
+      if (reopening) {
+        setClauses.push('completed_at = NULL')
+        setClauses.push('checkin_sent_at = CASE WHEN checkin_sent_at = completed_at THEN NULL ELSE checkin_sent_at END')
+      }
 
       if (setClauses.length === 0) return res.json(before)
       values.push(req.params.id)

@@ -88,7 +88,7 @@ test('passes safe prompt through and logs ok', async () => {
   const insert = queryFn.calls.find(c => /INSERT INTO ai_interactions/.test(c.sql))
   assert.ok(insert, 'expected an audit-log INSERT')
   // status param is the 11th positional ($11)
-  assert.equal(insert.params[10], 'ok')
+  assert.equal(insert.params[9], 'ok')
 })
 
 test('honors messages[] input shape', async () => {
@@ -120,7 +120,7 @@ test('rejects empty input AND logs invalid_input row', async () => {
   )
   const insert = queryFn.calls.find(c => /INSERT INTO ai_interactions/.test(c.sql))
   assert.ok(insert, 'expected an audit-log row even on invalid_input')
-  assert.equal(insert.params[10], 'invalid_input')
+  assert.equal(insert.params[9], 'invalid_input')
 })
 
 test('rejects when conversation does not end with user AND logs', async () => {
@@ -141,7 +141,7 @@ test('rejects when conversation does not end with user AND logs', async () => {
   )
   const insert = queryFn.calls.find(c => /INSERT INTO ai_interactions/.test(c.sql))
   assert.ok(insert)
-  assert.equal(insert.params[10], 'invalid_input')
+  assert.equal(insert.params[9], 'invalid_input')
 })
 
 test('logs missing_key row when ANTHROPIC_API_KEY is unset', async () => {
@@ -159,7 +159,7 @@ test('logs missing_key row when ANTHROPIC_API_KEY is unset', async () => {
     )
     const insert = queryFn.calls.find(c => /INSERT INTO ai_interactions/.test(c.sql))
     assert.ok(insert, 'expected an audit-log row when key is missing')
-    assert.equal(insert.params[10], 'missing_key')
+    assert.equal(insert.params[9], 'missing_key')
   } finally {
     if (prevKey !== undefined) process.env.ANTHROPIC_API_KEY = prevKey
   }

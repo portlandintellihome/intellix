@@ -40,7 +40,6 @@ router.get('/', async (req, res, next) => {
       // KPIs (always month-to-date / point-in-time)
       kpiRevenueMtd,
       kpiActiveJobs,
-      kpiOpenTickets,
       kpiNewClientsMtd,
 
       // Jobs (range-dependent counts; total value/avg from proposals)
@@ -55,14 +54,8 @@ router.get('/', async (req, res, next) => {
       clientsNewThisMonth,
       topClientsByValue,
 
-      // Tickets
-      ticketCounts,
-      ticketAvgResolution,
-      ticketsByPriority,
-
       // Team
       jobsPerMember,
-      ticketsResolvedPerMember,
 
       // Revenue trend (always last 6 months)
       revenueByMonth,
@@ -77,7 +70,6 @@ router.get('/', async (req, res, next) => {
              WHERE status = 'Accepted' AND created_at >= date_trunc('month', NOW())`),
       query(`SELECT COUNT(*)::int AS v FROM jobs
              WHERE source_system IS NULL AND status IN ('scheduled', 'in_progress')`),
-      query(`SELECT COUNT(*)::int AS v FROM support_tickets WHERE status <> 'Resolved'`),
       query(`SELECT COUNT(*)::int AS v FROM clients WHERE created_at >= date_trunc('month', NOW())`),
 
       query(`SELECT COUNT(*)::int AS v FROM jobs ${liveJobsWhere}`, sinceParam),
@@ -105,28 +97,10 @@ router.get('/', async (req, res, next) => {
              ORDER BY value DESC
              LIMIT 5`),
 
-      query(`SELECT
-               COUNT(*) FILTER (WHERE status <> 'Resolved')::int AS open,
-               COUNT(*) FILTER (WHERE status = 'Resolved')::int  AS closed
-             FROM support_tickets ${sinceWhere}`, sinceParam),
-      query(`SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600), 0)::float AS hours
-             FROM support_tickets
-             WHERE status = 'Resolved' AND resolved_at IS NOT NULL ${sinceAnd}`, sinceParam),
-      query(`SELECT COALESCE(priority, 'Normal') AS priority, COUNT(*)::int AS count
-             FROM support_tickets ${sinceWhere}
-             GROUP BY 1 ORDER BY count DESC`, sinceParam),
 
       query(`SELECT initials, COUNT(*)::int AS count FROM (
                SELECT UNNEST(assigned) AS initials FROM jobs ${liveJobsWhere}
              ) sub GROUP BY initials ORDER BY count DESC`, sinceParam),
-      query(`SELECT tm.name, tm.initials, COUNT(t.id)::int AS count
-             FROM team_members tm
-             LEFT JOIN support_tickets t ON t.assigned_to = tm.id
-                                         AND t.status = 'Resolved'
-                                         ${since ? 'AND t.created_at >= $1' : ''}
-             GROUP BY tm.id, tm.name, tm.initials
-             HAVING COUNT(t.id) > 0
-             ORDER BY count DESC`, sinceParam),
 
       query(`SELECT TO_CHAR(date_trunc('month', created_at), 'YYYY-MM') AS month,
                     COALESCE(SUM(total), 0)::float AS total
@@ -177,7 +151,6 @@ router.get('/', async (req, res, next) => {
       kpi: {
         revenue_mtd:    num(kpiRevenueMtd.rows[0]?.v),
         active_jobs:    num(kpiActiveJobs.rows[0]?.v),
-        open_tickets:   num(kpiOpenTickets.rows[0]?.v),
         new_clients_mtd: num(kpiNewClientsMtd.rows[0]?.v),
       },
       jobs: {
@@ -193,15 +166,8 @@ router.get('/', async (req, res, next) => {
         new_this_month: num(clientsNewThisMonth.rows[0]?.v),
         top_by_value: topClientsByValue.rows,
       },
-      tickets: {
-        open:   num(ticketCounts.rows[0]?.open),
-        closed: num(ticketCounts.rows[0]?.closed),
-        avg_resolution_hours: num(ticketAvgResolution.rows[0]?.hours),
-        by_priority: ticketsByPriority.rows,
-      },
       team: {
         jobs_per_member: jobsPerMember.rows,
-        tickets_resolved_per_member: ticketsResolvedPerMember.rows,
       },
       revenue: {
         by_month: revenueByMonth.rows,

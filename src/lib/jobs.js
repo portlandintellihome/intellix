@@ -9,7 +9,3 @@ export function isLiveJob(job) {
 
 // "Active" everywhere = native scheduled + in_progress (same as the Jobs tab).
 export const ACTIVE_STATUSES = ['scheduled', 'in_progress']
-
-export function isActiveLiveJob(job) {
-  return isLiveJob(job) && ACTIVE_STATUSES.includes(job.status)
-}

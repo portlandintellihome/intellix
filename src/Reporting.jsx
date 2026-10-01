@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { apiGet } from './lib/api'
@@ -13,12 +13,6 @@ const RANGES = [
   { id: 'all', label: 'All time' },
 ]
 
-const PRIORITY_COLOR = {
-  Urgent: '#ff3b30',
-  High:   '#ff9500',
-  Normal: '#0066cc',
-  Low:    '#34c759',
-}
 const STATUS_COLOR = '#0066cc'
 const REVENUE_COLOR = '#34c759'
 
@@ -30,7 +24,6 @@ const s = {
   cardTitle: { fontSize: 11, color: 'var(--text2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 14 },
   kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 },
   twoCol: { display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 12, marginBottom: 12 },
-  threeCol: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 },
   empty: { color: 'var(--text3)', fontSize: 12, padding: '20px 0', textAlign: 'center' },
 }
 
@@ -135,7 +128,6 @@ export default function Reporting() {
             <div style={s.kpiGrid}>
               <KpiCard label="Revenue MTD"    value={fmtMoney(data.kpi.revenue_mtd)}      sub="from accepted proposals" color="#34c759" />
               <KpiCard label="Active jobs"    value={fmtNumber(data.kpi.active_jobs)}     sub="scheduled + in progress"        color="#0066cc" />
-              <KpiCard label="Open tickets"   value={fmtNumber(data.kpi.open_tickets)}    sub="status ≠ Resolved"        color="#ff3b30" />
               <KpiCard label="New clients MTD" value={fmtNumber(data.kpi.new_clients_mtd)} sub="this calendar month"      color="#ff9500" />
             </div>
 
@@ -162,8 +154,8 @@ export default function Reporting() {
               )}
             </div>
 
-            {/* Two-up: Jobs by status + Ticket priority */}
-            <div style={s.twoCol}>
+            {/* Jobs by status */}
+            <div style={{ marginBottom: 12 }}>
               <div style={s.card}>
                 <div style={s.cardTitle}>Jobs by status</div>
                 {data.jobs.by_status.length === 0 ? (
@@ -182,50 +174,10 @@ export default function Reporting() {
                   </div>
                 )}
               </div>
-
-              <div style={s.card}>
-                <div style={s.cardTitle}>Tickets by priority</div>
-                {data.tickets.by_priority.length === 0 ? (
-                  <div style={s.empty}>No tickets in this range.</div>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, height: 240 }}>
-                    <div style={{ flex: 1, minWidth: 0, height: '100%' }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={data.tickets.by_priority}
-                            dataKey="count"
-                            nameKey="priority"
-                            innerRadius={50}
-                            outerRadius={85}
-                            paddingAngle={2}
-                            stroke="var(--bg2)"
-                            strokeWidth={2}
-                          >
-                            {data.tickets.by_priority.map(d => (
-                              <Cell key={d.priority} fill={PRIORITY_COLOR[d.priority] || 'var(--text3)'} />
-                            ))}
-                          </Pie>
-                          <Tooltip content={<TooltipBox />} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0, paddingRight: 4 }}>
-                      {data.tickets.by_priority.map(d => (
-                        <div key={d.priority} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5 }}>
-                          <span style={{ width: 9, height: 9, borderRadius: 2, background: PRIORITY_COLOR[d.priority] || 'var(--text3)' }} />
-                          <span style={{ color: 'var(--text)' }}>{d.priority}</span>
-                          <span style={{ color: 'var(--text3)' }}>· {d.count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
 
-            {/* Three-up: Jobs summary + Tickets summary + Closed-this-month delta */}
-            <div style={s.threeCol}>
+            {/* Two-up: Jobs summary + Clients summary */}
+            <div style={{ ...s.twoCol, gridTemplateColumns: '1fr 1fr' }}>
               <div style={s.card}>
                 <div style={s.cardTitle}>Jobs in range</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -233,15 +185,6 @@ export default function Reporting() {
                   <Stat label="Total proposal $" value={fmtMoney(data.jobs.total_proposal_value)} />
                   <Stat label="Avg proposal $" value={fmtMoney(data.jobs.avg_proposal_value)} />
                   <Stat label="Closed this mo." value={`${data.jobs.closed_this_month} / ${data.jobs.closed_last_month} last`} small />
-                </div>
-              </div>
-
-              <div style={s.card}>
-                <div style={s.cardTitle}>Tickets in range</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <Stat label="Open" value={fmtNumber(data.tickets.open)} color="#ff3b30" />
-                  <Stat label="Closed" value={fmtNumber(data.tickets.closed)} color="#34c759" />
-                  <Stat label="Avg resolution" value={data.tickets.avg_resolution_hours > 0 ? `${data.tickets.avg_resolution_hours.toFixed(1)}h` : '—'} small />
                 </div>
               </div>
 
@@ -339,18 +282,6 @@ export default function Reporting() {
               </>
             )}
 
-            {data.team.tickets_resolved_per_member.length > 0 && (
-              <div style={{ ...s.card, marginTop: 12 }}>
-                <div style={s.cardTitle}>Team — tickets resolved</div>
-                {data.team.tickets_resolved_per_member.map(m => (
-                  <div key={m.initials || m.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border2)' }}>
-                    <div style={{ width: 26, height: 26, minWidth: 26, borderRadius: '50%', background: colorForInitials(m.initials || m.name), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10.5, fontWeight: 700 }}>{m.initials || (m.name || '?').slice(0,2).toUpperCase()}</div>
-                    <div style={{ flex: 1, fontSize: 12, color: 'var(--text)' }}>{m.name || m.initials}</div>
-                    <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>{m.count}</div>
-                  </div>
-                ))}
-              </div>
-            )}
 
           </>
         )}

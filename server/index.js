@@ -9,7 +9,6 @@ import authRouter from './routes/auth.js'
 import jobsRouter from './routes/jobs.js'
 import clientsRouter from './routes/clients.js'
 import locationsRouter from './routes/locations.js'
-import ticketsRouter from './routes/tickets.js'
 import inventoryRouter from './routes/inventory.js'
 import teamRouter from './routes/team.js'
 import driversRouter from './routes/drivers.js'
@@ -48,7 +47,6 @@ app.use('/api/auth', authRouter)
 app.use('/api/jobs', jobsRouter)
 app.use('/api/clients', clientsRouter)
 app.use('/api/locations', locationsRouter)
-app.use('/api/tickets', ticketsRouter)
 app.use('/api/inventory', inventoryRouter)
 app.use('/api/team', teamRouter)
 app.use('/api/drivers', driversRouter)

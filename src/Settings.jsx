@@ -460,7 +460,7 @@ function Notifications({ data, onChange }) {
         checked={Boolean(data.email_notifications)}
         onChange={v => onChange('email_notifications', v)}
         label="Email notifications"
-        hint="New tickets, proposal status changes, daily digests"
+        hint="Proposal status changes, daily digests"
       />
       <div style={{ marginTop: 0 }}>
         <Toggle

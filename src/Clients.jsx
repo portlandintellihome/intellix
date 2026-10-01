@@ -407,7 +407,7 @@ export default function Clients() {
         {filtered.length === 0 && clients.length === 0 && (
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>No clients added</div>
-            <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 14 }}>Add your first client to start tracking jobs, proposals, and tickets.</div>
+            <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 14 }}>Add your first client to start tracking jobs and proposals.</div>
             <button onClick={() => setShowNew(true)} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#1d1d1f', color: '#fff', fontFamily: 'var(--font)' }}>+ New client</button>
           </div>
         )}

@@ -15,7 +15,7 @@ router.get('/status', (_req, res) => {
 router.post('/process', requireAuth, async (req, res, next) => {
   const start = Date.now()
   const {
-    taskType, clientId, jobId, ticketId,
+    taskType, clientId, jobId,
     prompt, messages, systemPrompt, model,
   } = req.body || {}
 
@@ -33,7 +33,6 @@ router.post('/process', requireAuth, async (req, res, next) => {
       userId: req.user?.id ?? null,
       clientId: clientId ?? null,
       jobId: jobId ?? null,
-      ticketId: ticketId ?? null,
       prompt,
       messages,
       systemPrompt,

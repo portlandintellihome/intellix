@@ -139,7 +139,6 @@ UPDATE settings SET checkin_email_body =
   <p style="font-size: 15px; line-height: 1.6; margin: 0 0 14px; color: #3a3a3c;"><strong>If everything is great</strong>, would you mind leaving us a quick Google review? It takes 30 seconds and it makes a big difference for a small business.</p>
   <p style="margin: 0 0 24px; text-align: center;"><a href="{{review_url}}" style="display: inline-block; padding: 12px 22px; background: #34c759; color: #fff; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 600;">Leave a Google review</a></p>
   <p style="font-size: 15px; line-height: 1.6; margin: 0 0 14px; color: #3a3a3c;"><strong>If something is not quite right</strong>, please let us know and we''ll come take care of it.</p>
-  <p style="margin: 0 0 28px; text-align: center;"><a href="{{support_url}}" style="display: inline-block; padding: 12px 22px; background: #0066cc; color: #fff; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 600;">Submit a support request</a></p>
   <p style="font-size: 15px; line-height: 1.6; margin: 0 0 4px; color: #3a3a3c;">Thanks again for choosing IntelliHome.</p>
   <p style="font-size: 15px; line-height: 1.6; margin: 0; color: #1d1d1f; font-weight: 600;">— The IntelliHome team</p>
 </body></html>'
@@ -230,44 +229,6 @@ CREATE TABLE IF NOT EXISTS team_members (
   current_job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
--- DEPRECATED FEATURE: the Support Tickets UI (src/SupportTickets.jsx), the
--- public intake form (src/Support.jsx + /api/support), and that route were
--- removed. This table is RETAINED for data safety — historical tickets live
--- here and tickets.js / reporting.js / todos.js still reference it. Do not
--- drop without a data audit + removing those references.
-CREATE TABLE IF NOT EXISTS support_tickets (
-  id SERIAL PRIMARY KEY,
-  ticket_id TEXT UNIQUE,
-  client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
-  contact TEXT,
-  phone TEXT,
-  issue TEXT NOT NULL,
-  type TEXT,
-  priority TEXT DEFAULT 'Normal',
-  status TEXT DEFAULT 'Open',
-  assigned_to INTEGER REFERENCES team_members(id) ON DELETE SET NULL,
-  job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
-  notes TEXT,
-  resolved_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Backfill for the reporting route's avg-resolution-time metric.
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
-
--- Public support intake: tickets that arrive via the /support form rather
--- than the internal CRM. intake_source distinguishes them. contact_*
--- fields snapshot the form data at submit time (independent of any
--- matched client record). attachment_url points at the uploaded photo
--- (if any). raw_payload holds the full intake JSON for replay/debugging.
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS intake_source TEXT DEFAULT 'internal';
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS contact_name TEXT;
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS contact_email TEXT;
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS contact_phone TEXT;
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS contact_address TEXT;
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS attachment_url TEXT;
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS raw_payload JSONB;
 
 CREATE TABLE IF NOT EXISTS inventory (
   id SERIAL PRIMARY KEY,
@@ -371,7 +332,6 @@ CREATE TABLE IF NOT EXISTS ai_interactions (
   task_type TEXT NOT NULL,
   client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
   job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
-  ticket_id INTEGER REFERENCES support_tickets(id) ON DELETE SET NULL,
   redacted_prompt TEXT,
   raw_response TEXT,
   model TEXT,
@@ -394,7 +354,6 @@ CREATE TABLE IF NOT EXISTS todos (
   created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
   job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
   client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
-  ticket_id INTEGER REFERENCES support_tickets(id) ON DELETE SET NULL,
   priority TEXT DEFAULT 'normal',
   status TEXT DEFAULT 'open',
   due_date DATE,
@@ -427,7 +386,7 @@ CREATE TABLE IF NOT EXISTS composer_builds (
 
 -- Jobsite documentation photos. file_path is the public URL path
 -- (/uploads/jobs/<uuid>.<ext>) served by the static mount in index.js,
--- mirroring the support-ticket attachment pattern.
+-- mirroring the (since removed) support-ticket attachment pattern.
 CREATE TABLE IF NOT EXISTS job_photos (
   id SERIAL PRIMARY KEY,
   job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -637,3 +596,27 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_source_id
 -- Unmatched (client_id NULL) jobs are cheap to find for later reconciliation.
 CREATE INDEX IF NOT EXISTS idx_jobs_unmatched
   ON jobs (source_system) WHERE client_id IS NULL;
+
+-- ============================================================================
+-- REMOVED FEATURE: Support Tickets (2026-09-30)
+-- ----------------------------------------------------------------------------
+-- The UI, public /support intake form and API are all gone. Audited before
+-- dropping: support_tickets held one test row ("testing", form_unmatched, no
+-- client/job), and no todo or ai_interactions row referenced a ticket. The
+-- ticket_id columns go first (taking their FKs with them) so the table drop
+-- needs no CASCADE. Idempotent; must stay after the todos / ai_interactions
+-- CREATE TABLEs so it also runs cleanly on a fresh database.
+-- ============================================================================
+ALTER TABLE todos           DROP COLUMN IF EXISTS ticket_id;
+ALTER TABLE ai_interactions DROP COLUMN IF EXISTS ticket_id;
+DROP TABLE IF EXISTS support_tickets;
+
+-- The check-in email fallback template linked a "Submit a support request"
+-- button to /support, which no longer exists. Strip that button from the
+-- stored template (the seed above no longer includes it). No-op once removed.
+UPDATE settings
+   SET checkin_email_body = regexp_replace(
+         checkin_email_body,
+         '\s*<p[^>]*><a href="\{\{support_url\}\}"[^>]*>[^<]*</a></p>',
+         '', 'g')
+ WHERE id = 1 AND checkin_email_body LIKE '%{{support_url}}%';
